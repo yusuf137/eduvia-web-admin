@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubdomainInstitution } from '../hooks/useSubdomainInstitution';
 import { loginWithEmail, logout } from '../services/authService';
+import EduviaLogo from '../components/EduviaLogo';
 import LoadingScreen from '../components/LoadingScreen';
 import { getInstitutionPanelHost } from '../utils/subdomain';
 
@@ -97,11 +98,7 @@ export default function LoginPage() {
     }
   };
 
-  const heading = tenantInstitution?.name
-    ? `${tenantInstitution.name} Paneli`
-    : hasSubdomain
-      ? 'Kurum Paneli'
-      : 'Eduvia Web Admin';
+  const heading = tenantInstitution?.name ? `${tenantInstitution.name} Paneli` : null;
 
   const subtitle = tenantInstitution
     ? `${panelHost} üzerinden giriş yapın`
@@ -113,9 +110,9 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-card__brand">
-          <div className="login-card__logo">E</div>
-          <h1>{heading}</h1>
-          <p>{subtitle}</p>
+          <EduviaLogo variant="login" />
+          {heading ? <h1 className="login-card__heading">{heading}</h1> : null}
+          <p className="login-card__subtitle">{subtitle}</p>
           {panelHost && tenantInstitution ? (
             <p className="login-card__host">{panelHost}</p>
           ) : null}

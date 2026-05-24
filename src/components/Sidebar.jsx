@@ -1,14 +1,12 @@
 import { NavLink } from 'react-router-dom';
+import EduviaLogo from './EduviaLogo';
 
-export default function Sidebar({ title, subtitle, items }) {
+export default function Sidebar({ subtitle, items }) {
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
-        <div className="sidebar__logo">E</div>
-        <div>
-          <div className="sidebar__title">{title}</div>
-          {subtitle ? <div className="sidebar__subtitle">{subtitle}</div> : null}
-        </div>
+        <EduviaLogo variant="sidebar" />
+        {subtitle ? <div className="sidebar__subtitle">{subtitle}</div> : null}
       </div>
       <nav className="sidebar__nav">
         {items.map((item) => (

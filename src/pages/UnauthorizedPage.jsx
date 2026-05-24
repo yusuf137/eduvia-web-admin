@@ -1,5 +1,6 @@
 import { ShieldAlert } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import EduviaLogo from '../components/EduviaLogo';
 import { logout } from '../services/authService';
 
 export default function UnauthorizedPage() {
@@ -9,6 +10,7 @@ export default function UnauthorizedPage() {
   return (
     <div className="center-page">
       <div className="center-card">
+        <EduviaLogo variant="login" className="center-card__logo" />
         <ShieldAlert size={40} className="center-card__icon center-card__icon--warn" />
         <h1>Yetkisiz Erişim</h1>
         <p>

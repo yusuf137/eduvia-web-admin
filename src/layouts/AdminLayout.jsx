@@ -51,7 +51,7 @@ export default function AdminLayout() {
 
   return (
     <div className="app-shell">
-      <Sidebar title="Eduvia" subtitle="Kurum Admin" items={menuItems} />
+      <Sidebar subtitle="Kurum Admin" items={menuItems} />
       <div className="app-shell__main">
         <Topbar pageTitle={pageTitle} />
         <main className="app-shell__content">

@@ -25,7 +25,7 @@ export default function SuperAdminLayout() {
 
   return (
     <div className="app-shell">
-      <Sidebar title="Eduvia" subtitle="SuperAdmin" items={MENU} />
+      <Sidebar subtitle="SuperAdmin" items={MENU} />
       <div className="app-shell__main">
         <Topbar pageTitle={pageTitle} />
         <main className="app-shell__content">
