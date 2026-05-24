@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubdomainInstitution } from '../hooks/useSubdomainInstitution';
-import { loginWithEmail, logout } from '../services/authService';
+import { loginWithEmail, logout, sendPasswordReset } from '../services/authService';
 import EduviaLogo from '../components/EduviaLogo';
 import LoadingScreen from '../components/LoadingScreen';
 import { getInstitutionPanelHost } from '../utils/subdomain';
@@ -49,6 +49,11 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [accessDenied, setAccessDenied] = useState('');
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
     if (!currentUser || !currentUserProfile || loading || tenantLoading) {
@@ -80,6 +85,53 @@ export default function LoginPage() {
       : '';
 
   const loginBlocked = hasSubdomain && (tenantError || !tenantInstitution);
+
+  const openResetModal = () => {
+    setResetEmail(email || '');
+    setResetError('');
+    setResetSuccess('');
+    setResetModalOpen(true);
+  };
+
+  const closeResetModal = () => {
+    setResetModalOpen(false);
+    setResetError('');
+    setResetSuccess('');
+    setResetLoading(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!resetEmail.trim()) {
+      setResetError('Lütfen e-posta adresinizi girin.');
+      return;
+    }
+
+    if (!resetEmail.includes('@')) {
+      setResetError('Lütfen geçerli bir e-posta adresi girin.');
+      return;
+    }
+
+    try {
+      setResetLoading(true);
+      setResetError('');
+      setResetSuccess('');
+
+      await sendPasswordReset(resetEmail.trim());
+
+      setResetSuccess('Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.');
+    } catch (err) {
+      const code = err?.code;
+      if (code === 'auth/user-not-found') {
+        setResetError('Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.');
+      } else if (code === 'auth/invalid-email') {
+        setResetError('Geçersiz e-posta adresi.');
+      } else {
+        setResetError('Şifre sıfırlama e-postası gönderilemedi. Lütfen tekrar deneyin.');
+      }
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -151,8 +203,64 @@ export default function LoginPage() {
             disabled={submitting || loginBlocked}>
             {submitting ? 'Giriş yapılıyor…' : 'Giriş Yap'}
           </button>
+          <button
+            type="button"
+            className="login-forgot-link"
+            disabled={loginBlocked}
+            onClick={openResetModal}>
+            Şifremi unuttum
+          </button>
         </form>
       </div>
+
+      {resetModalOpen ? (
+        <div
+          className="modal-backdrop login-reset-backdrop"
+          role="presentation"
+          onClick={closeResetModal}>
+          <div
+            className="modal-card login-reset-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-modal-title"
+            onClick={(e) => e.stopPropagation()}>
+            <h3 id="reset-modal-title">Şifre Sıfırlama</h3>
+            <p className="login-reset-modal__desc">
+              Hesabınıza bağlı e-posta adresini girin. Şifre sıfırlama bağlantısı e-posta adresinize
+              gönderilecektir.
+            </p>
+            <label className="login-reset-modal__label">
+              E-posta
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                autoComplete="email"
+                autoFocus
+                disabled={resetLoading}
+              />
+            </label>
+            {resetError ? <div className="form-error">{resetError}</div> : null}
+            {resetSuccess ? <div className="alert alert--success">{resetSuccess}</div> : null}
+            <div className="modal-card__actions login-reset-modal__actions">
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={resetLoading}
+                onClick={() => void handlePasswordReset()}>
+                {resetLoading ? 'Gönderiliyor…' : 'Gönder'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                disabled={resetLoading}
+                onClick={closeResetModal}>
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
