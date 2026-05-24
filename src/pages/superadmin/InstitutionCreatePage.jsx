@@ -1,11 +1,22 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import InstitutionModulesEditor from '../../components/InstitutionModulesEditor';
+import { useAuth } from '../../contexts/AuthContext';
 import { DEFAULT_MODULES, normalizeModules } from '../../constants/institutionModules';
 import {
   createInstitution,
   slugifyInstitutionName,
 } from '../../services/institutionService';
+
+function formatCreateError(err) {
+  if (err?.code === 'slug-duplicate') {
+    return 'Bu subdomain zaten kullanılıyor. Farklı bir slug deneyin.';
+  }
+  if (err?.code === 'permission-denied') {
+    return 'Yetki hatası: Firestore rules kurum oluşturma verisini reddetti. Console loglarını kontrol edin.';
+  }
+  return err?.message ?? 'Kurum oluşturulamadı.';
+}
 
 const EMPTY = {
   name: '',
@@ -19,6 +30,7 @@ const EMPTY = {
 
 export default function InstitutionCreatePage() {
   const navigate = useNavigate();
+  const { currentUser, currentUserProfile, loading: authLoading } = useAuth();
   const [form, setForm] = useState(EMPTY);
   const [modules, setModules] = useState(() => normalizeModules(DEFAULT_MODULES));
   const [slugTouched, setSlugTouched] = useState(false);
@@ -36,25 +48,38 @@ export default function InstitutionCreatePage() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+
+    if (authLoading) {
+      setError('Profil yükleniyor, lütfen bekleyin.');
+      return;
+    }
+
+    if (!currentUser?.uid || currentUserProfile?.role !== 'superAdmin') {
+      setError('Bu işlem için SuperAdmin yetkisi gerekir.');
+      return;
+    }
+
     setError('');
     setSuccess('');
     setSubmitting(true);
     try {
-      const result = await createInstitution({
-        ...form,
-        isActive: true,
-        modules,
-      });
-      setSuccess(`Kurum oluşturuldu. Slug: ${result.slug}`);
+      const result = await createInstitution(
+        {
+          ...form,
+          isActive: true,
+          modules,
+        },
+        { currentUserProfile },
+      );
+      const warn = result.publicSyncFailed
+        ? ' (Subdomain kaydı senkronize edilemedi; console loglarına bakın.)'
+        : '';
+      setSuccess(`Kurum oluşturuldu. Slug: ${result.slug}${warn}`);
       setTimeout(() => {
         navigate('/superadmin/institutions');
       }, 1200);
     } catch (err) {
-      if (err?.code === 'slug-duplicate') {
-        setError('Bu subdomain zaten kullanılıyor. Farklı bir slug deneyin.');
-      } else {
-        setError(err?.message ?? 'Kurum oluşturulamadı.');
-      }
+      setError(formatCreateError(err));
     } finally {
       setSubmitting(false);
     }

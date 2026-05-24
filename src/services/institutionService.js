@@ -75,18 +75,47 @@ function sortByCreatedAtDesc(rows) {
   return [...rows].sort((a, b) => b.sortMs - a.sortMs);
 }
 
+/** Firestore create için yalnızca kanonik modül anahtarları (legacy videos/makeup hariç). */
+function buildInstitutionModulesForCreate(modules) {
+  const canonical = normalizeModules(modules);
+  const payload = {};
+  Object.keys(DEFAULT_MODULES).forEach((key) => {
+    payload[key] = canonical[key] !== false;
+  });
+  return payload;
+}
+
 async function syncInstitutionPublic(institutionId, { name, slug, isActive }) {
   const cleanSlug = slugifyInstitutionName(slug);
   if (!cleanSlug || !institutionId) {
     return;
   }
-  await setDoc(doc(db, 'institutionPublic', cleanSlug), {
+
+  const publicData = {
     institutionId: String(institutionId),
     name: String(name ?? '').trim(),
     slug: cleanSlug,
     isActive: isActive !== false,
     updatedAt: serverTimestamp(),
+  };
+
+  // eslint-disable-next-line no-console
+  console.log('SYNC INSTITUTION PUBLIC DATA:', {
+    ...publicData,
+    updatedAt: '[serverTimestamp]',
   });
+  // eslint-disable-next-line no-console
+  console.log('SYNC INSTITUTION PUBLIC KEYS:', Object.keys(publicData));
+
+  try {
+    await setDoc(doc(db, 'institutionPublic', cleanSlug), publicData);
+    // eslint-disable-next-line no-console
+    console.log('SYNC INSTITUTION PUBLIC SUCCESS:', cleanSlug);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log('SYNC INSTITUTION PUBLIC ERROR:', error.code, error.message);
+    throw error;
+  }
 }
 
 /** Giriş öncesi subdomain çözümlemesi (orderBy yok). */
@@ -156,29 +185,61 @@ export async function isSlugTaken(slug) {
   if (!cleanSlug) {
     return false;
   }
-  const publicSnap = await getDoc(doc(db, 'institutionPublic', cleanSlug));
-  if (publicSnap.exists()) {
-    return true;
+
+  // eslint-disable-next-line no-console
+  console.log('CHECK SLUG START:', cleanSlug);
+
+  try {
+    const publicSnap = await getDoc(doc(db, 'institutionPublic', cleanSlug));
+    if (publicSnap.exists()) {
+      // eslint-disable-next-line no-console
+      console.log('CHECK SLUG TAKEN (institutionPublic):', cleanSlug);
+      return true;
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log('CHECK SLUG PUBLIC ERROR:', error.code, error.message);
+    throw error;
   }
-  const snap = await getDocs(
-    query(collection(db, 'institutions'), where('slug', '==', cleanSlug), limit(1)),
-  );
-  return !snap.empty;
+
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'institutions'), where('slug', '==', cleanSlug), limit(1)),
+    );
+    const taken = !snap.empty;
+    // eslint-disable-next-line no-console
+    console.log('CHECK SLUG INSTITUTIONS:', cleanSlug, taken ? 'taken' : 'available');
+    return taken;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log('CHECK SLUG INSTITUTIONS ERROR:', error.code, error.message);
+    throw error;
+  }
 }
 
-export async function createInstitution({
-  name,
-  slug,
-  phone,
-  email,
-  city,
-  address,
-  isActive = true,
-  modules,
-}) {
+export async function createInstitution(
+  { name, slug, phone, email, city, address, isActive = true, modules },
+  { currentUserProfile } = {},
+) {
   const uid = auth.currentUser?.uid;
+
+  // eslint-disable-next-line no-console
+  console.log('CREATE INSTITUTION START');
+  // eslint-disable-next-line no-console
+  console.log('CURRENT USER UID:', uid);
+  // eslint-disable-next-line no-console
+  console.log('CURRENT USER PROFILE:', currentUserProfile);
+  // eslint-disable-next-line no-console
+  console.log('CURRENT USER ROLE:', currentUserProfile?.role);
+
   if (!uid) {
-    throw new Error('Oturum bulunamadı.');
+    throw Object.assign(new Error('Oturum bulunamadı.'), { code: 'auth/not-authenticated' });
+  }
+
+  if (currentUserProfile?.role !== 'superAdmin') {
+    throw Object.assign(new Error('Bu işlem için SuperAdmin yetkisi gerekir.'), {
+      code: 'permission-denied',
+    });
   }
 
   const cleanName = String(name ?? '').trim();
@@ -187,9 +248,7 @@ export async function createInstitution({
     throw new Error('Kurum adı ve slug zorunludur.');
   }
 
-  const modulesPayload = buildModulesPayload(modules);
-  // eslint-disable-next-line no-console
-  console.log('WEB INSTITUTION MODULES:', modulesPayload);
+  const modulesPayload = buildInstitutionModulesForCreate(modules);
 
   try {
     const taken = await isSlugTaken(cleanSlug);
@@ -203,7 +262,7 @@ export async function createInstitution({
       throw error;
     }
     // eslint-disable-next-line no-console
-    console.log('WEB INSTITUTION CREATE ERROR:', error.code, error.message);
+    console.log('CREATE INSTITUTION ABORTED AT SLUG CHECK:', error.code, error.message);
     throw error;
   }
 
@@ -222,25 +281,48 @@ export async function createInstitution({
   };
 
   // eslint-disable-next-line no-console
-  console.log('WEB INSTITUTION CREATE DATA:', {
+  console.log('CREATE INSTITUTION DATA:', {
     ...institutionData,
+    modules: modulesPayload,
     createdAt: '[serverTimestamp]',
     updatedAt: '[serverTimestamp]',
   });
+  // eslint-disable-next-line no-console
+  console.log('CREATE INSTITUTION KEYS:', Object.keys(institutionData));
+
+  let institutionRef;
+  try {
+    institutionRef = await addDoc(collection(db, 'institutions'), institutionData);
+    // eslint-disable-next-line no-console
+    console.log('CREATE INSTITUTION SUCCESS:', institutionRef.id);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log('CREATE INSTITUTION ERROR:', error.code, error.message);
+    throw error;
+  }
 
   try {
-    const ref = await addDoc(collection(db, 'institutions'), institutionData);
-    await syncInstitutionPublic(ref.id, {
+    await syncInstitutionPublic(institutionRef.id, {
       name: cleanName,
       slug: cleanSlug,
       isActive: institutionData.isActive,
     });
-    return { id: ref.id, slug: cleanSlug };
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.log('WEB INSTITUTION CREATE ERROR:', error.code, error.message);
-    throw error;
+    console.log(
+      'CREATE INSTITUTION WARNING: institution created but institutionPublic sync failed:',
+      institutionRef.id,
+      error.code,
+      error.message,
+    );
+    return {
+      id: institutionRef.id,
+      slug: cleanSlug,
+      publicSyncFailed: true,
+    };
   }
+
+  return { id: institutionRef.id, slug: cleanSlug };
 }
 
 export async function updateInstitutionModules(institutionId, modules) {

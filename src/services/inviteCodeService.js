@@ -86,30 +86,44 @@ export async function createAdminInviteCode(institutionId, institutionName) {
     throw new Error('Kurum seçin.');
   }
 
+  // eslint-disable-next-line no-console
+  console.log('CREATE ADMIN INVITE CODE START:', inst);
+
   const maxAttempts = 25;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const code = randomInviteCode();
     const ref = doc(db, 'inviteCodes', code);
+    const inviteCodeData = {
+      code,
+      role: 'admin',
+      institutionId: inst,
+      institutionName: instName || '—',
+      used: false,
+      usedBy: null,
+      usedAt: null,
+      createdBy: uid,
+      createdAt: serverTimestamp(),
+    };
+
     try {
       const existing = await getDoc(ref);
       if (existing.exists()) {
         continue;
       }
-      await setDoc(ref, {
-        code,
-        role: 'admin',
-        institutionId: inst,
-        institutionName: instName || '—',
-        used: false,
-        usedBy: null,
-        usedAt: null,
-        createdBy: uid,
-        createdAt: serverTimestamp(),
+
+      // eslint-disable-next-line no-console
+      console.log('CREATE ADMIN INVITE CODE DATA:', {
+        ...inviteCodeData,
+        createdAt: '[serverTimestamp]',
       });
+
+      await setDoc(ref, inviteCodeData);
+      // eslint-disable-next-line no-console
+      console.log('CREATE ADMIN INVITE CODE SUCCESS:', code);
       return code;
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.log('ADMIN CODE CREATE ERROR:', error.code, error.message);
+      console.log('CREATE ADMIN INVITE CODE ERROR:', error.code, error.message);
       throw error;
     }
   }
