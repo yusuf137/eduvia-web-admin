@@ -15,7 +15,18 @@ cd eduvia-web-admin
 npm install
 ```
 
-`src/firebase/firebaseConfig.js` içine mobil Eduvia Firebase değerlerini girin.
+Proje kökünde `.env.example` dosyasını `.env` olarak kopyalayın ve Firebase Console değerlerini doldurun:
+
+```env
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+```
+
+Canlı ortam (Vercel): Project Settings → Environment Variables içine aynı `VITE_*` anahtarlarını ekleyin.
 
 ```bash
 npm run dev

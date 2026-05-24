@@ -3,21 +3,24 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-/** Mobil Eduvia ile aynı Firebase projesi — değerleri buraya girin. */
-export const firebaseConfig = {
-  apiKey: 'AIzaSyDK-25hJZcDWX4JBI7dg3OqbujDbwqspB8',
-  authDomain: 'eduvia-804fc.firebaseapp.com',
-  projectId: 'eduvia-804fc',
-  storageBucket: 'eduvia-804fc.firebasestorage.app',
-  messagingSenderId: '121036189679',
-  appId: '1:121036189679:web:e6962a6836eaa4e7e9d01a',
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-export const isFirebaseConfigured =
-  Boolean(firebaseConfig.apiKey && firebaseConfig.apiKey !== 'BURAYA_YAZ');
+// eslint-disable-next-line no-console
+console.log('FIREBASE ENV CHECK:', {
+  hasApiKey: !!import.meta.env.VITE_FIREBASE_API_KEY,
+  hasProjectId: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
+});
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export default app;
