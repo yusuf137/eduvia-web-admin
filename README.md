@@ -26,7 +26,18 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 ```
 
-Canlı ortam (Vercel): Project Settings → Environment Variables içine aynı `VITE_*` anahtarlarını ekleyin.
+Canlı ortam (Vercel): **Project Settings → Environment Variables** içine aynı anahtarları ekleyin (Production + Preview + Development). `VITE_` öneki zorunludur; `FIREBASE_API_KEY` gibi öneksiz isimler çalışmaz. Kaydettikten sonra **Redeploy** yapın.
+
+| Vercel variable | Örnek |
+|-----------------|-------|
+| `VITE_FIREBASE_API_KEY` | `AIza...` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `proje-id.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID` | `proje-id` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | `proje-id.firebasestorage.app` |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | sayısal id |
+| `VITE_FIREBASE_APP_ID` | `1:...:web:...` |
+
+`npm run build` eksik env varsa `scripts/verify-firebase-env.mjs` ile durur (Vercel’de env unutulunca canlıda `auth/invalid-api-key` yerine build hatası alırsınız).
 
 ```bash
 npm run dev
