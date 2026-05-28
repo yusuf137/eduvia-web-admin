@@ -11,9 +11,20 @@ export const WEEKDAY_OPTIONS = [
   { day: 7, label: 'Pazar' },
 ];
 
-export const SCHEDULE_HOURS = Array.from({ length: 13 }, (_, i) =>
-  `${String(i + 9).padStart(2, '0')}:00`,
+/** Mobil AdminTeacherScheduleScreen ile aynı aralık: 08:00–23:00 */
+export const SCHEDULE_HOURS = Array.from({ length: 16 }, (_, i) =>
+  `${String(i + 8).padStart(2, '0')}:00`,
 );
+
+/** Grid anahtarı için saat: "9:00" → "09:00" */
+export function normalizeHourKey(hour) {
+  const raw = String(hour ?? '').trim();
+  const m = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) {
+    return raw;
+  }
+  return `${String(parseInt(m[1], 10)).padStart(2, '0')}:${m[2]}`;
+}
 
 export const LESSON_TYPE_LABELS = {
   private: 'Özel Ders',
@@ -128,7 +139,10 @@ function mapLessonDoc(d) {
     lessonType,
     isMakeup: data.isMakeup === true || lessonType === 'makeup',
     branch: String(data.branch ?? '').trim(),
-    day: typeof data.day === 'number' ? data.day : Number(data.day) || 0,
+    day: (() => {
+      const n = typeof data.day === 'number' ? data.day : Number(data.day);
+      return Number.isInteger(n) && n >= 1 && n <= 7 ? n : 0;
+    })(),
     startHour: String(data.startHour ?? ''),
     hours,
     duration: typeof data.duration === 'number' ? data.duration : Number(data.duration) || 0,
@@ -173,10 +187,10 @@ function mapCancellationDoc(d) {
 
 export function normalizeHours(lesson) {
   if (Array.isArray(lesson.hours) && lesson.hours.length) {
-    return lesson.hours.map(String);
+    return lesson.hours.map((h) => normalizeHourKey(h));
   }
   if (lesson.startHour) {
-    return [String(lesson.startHour)];
+    return [normalizeHourKey(lesson.startHour)];
   }
   return [];
 }
@@ -402,6 +416,8 @@ export function buildScheduleGridMap(lessons) {
 export async function fetchLessonsForTeacher(institutionId, teacherId) {
   const inst = String(institutionId ?? '').trim();
   const tid = String(teacherId ?? '').trim();
+  // eslint-disable-next-line no-console
+  console.log('FETCH LESSONS institutionId:', inst, 'teacherId:', tid);
   if (!inst || !tid) {
     return [];
   }
@@ -413,7 +429,10 @@ export async function fetchLessonsForTeacher(institutionId, teacherId) {
         where('teacherId', '==', tid),
       ),
     );
-    return snap.docs.map(mapLessonDoc);
+    const rows = snap.docs.map(mapLessonDoc);
+    // eslint-disable-next-line no-console
+    console.log('FETCH LESSONS COUNT:', rows.length, rows);
+    return rows;
   } catch (error) {
     // eslint-disable-next-line no-console
     console.log('WEB WEEKLY LESSONS ERROR:', error.code, error.message);

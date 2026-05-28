@@ -42,6 +42,8 @@ function mapPaymentDoc(d) {
     receiptNo: String(data.receiptNo ?? ''),
     receivedBy: String(data.receivedBy ?? ''),
     receivedByName: String(data.receivedByName ?? ''),
+    date: dateVal ?? null,
+    createdAt: data.createdAt ?? null,
     dateLabel,
     sortMs,
   };
@@ -145,6 +147,7 @@ export async function recordStudentPayment({
   console.log('RECEIPT COUNTER ID:', counterId);
 
   let receiptNo = '';
+  let receivedByName = String(adminName ?? '').trim() || '—';
 
   try {
     await runTransaction(db, async (transaction) => {
@@ -160,7 +163,7 @@ export async function recordStudentPayment({
       }
 
       const adminSnap = await transaction.get(adminRef);
-      const receivedByName =
+      receivedByName =
         String(adminName ?? '').trim() ||
         String(adminSnap.data()?.name ?? '').trim() ||
         '—';
@@ -228,12 +231,17 @@ export async function recordStudentPayment({
     throw error;
   }
 
+  const paidAtLabel = new Date().toLocaleString('tr-TR');
   return {
     paymentId: paymentRef.id,
+    institutionId: inst,
+    studentId,
     receiptNo,
     amount: amt,
     month: mk,
     studentName: String(studentName ?? '').trim(),
-    paidAtLabel: new Date().toLocaleString('tr-TR'),
+    receivedByName: String(adminName ?? '').trim(),
+    paidAtLabel,
+    date: new Date(),
   };
 }

@@ -11,7 +11,20 @@ import {
 } from 'firebase/firestore';
 
 const CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-const CODE_LENGTH = 8;
+const CODE_SUFFIX_LENGTH = 6;
+
+function roleCodePrefix(role) {
+  if (role === 'student') {
+    return 'STD';
+  }
+  if (role === 'teacher') {
+    return 'TCH';
+  }
+  if (role === 'adminTeacher') {
+    return 'ATH';
+  }
+  return '';
+}
 
 export const ORG_INVITE_ROLES = ['student', 'teacher', 'adminTeacher'];
 
@@ -26,12 +39,22 @@ export function inviteRoleLabel(role) {
   return ROLE_LABELS[role] ?? role;
 }
 
-function randomInviteCode() {
+function randomInviteSuffix(len = CODE_SUFFIX_LENGTH) {
   let code = '';
-  for (let i = 0; i < CODE_LENGTH; i++) {
+  for (let i = 0; i < len; i++) {
     code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
   }
   return code;
+}
+
+/** Mobil ile uyumlu: STD/TCH/ATH + 6 karakter */
+function randomOrgInviteCode(role) {
+  const prefix = roleCodePrefix(role);
+  return `${prefix}${randomInviteSuffix()}`;
+}
+
+function randomAdminInviteCode() {
+  return `ADM${randomInviteSuffix()}`;
 }
 
 function mapInviteDoc(d) {
@@ -91,7 +114,7 @@ export async function createAdminInviteCode(institutionId, institutionName) {
 
   const maxAttempts = 25;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const code = randomInviteCode();
+    const code = randomAdminInviteCode();
     const ref = doc(db, 'inviteCodes', code);
     const inviteCodeData = {
       code,
@@ -159,8 +182,8 @@ export async function createOrgInviteCode({
   institutionName = '',
   callerRole,
 }) {
-  if (callerRole !== 'admin') {
-    throw new Error('Yalnızca kurum admini davet kodu oluşturabilir.');
+  if (callerRole !== 'admin' && callerRole !== 'adminTeacher') {
+    throw new Error('Yalnızca kurum yöneticisi davet kodu oluşturabilir.');
   }
   const inst = String(institutionId ?? '').trim();
   if (!inst) {
@@ -181,7 +204,7 @@ export async function createOrgInviteCode({
 
   const maxAttempts = 25;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const code = randomInviteCode();
+    const code = randomOrgInviteCode(inviteRole);
     const ref = doc(db, 'inviteCodes', code);
     try {
       const existing = await getDoc(ref);
@@ -192,7 +215,7 @@ export async function createOrgInviteCode({
         code,
         role: inviteRole,
         institutionId: inst,
-        institutionName: String(institutionName ?? '').trim(),
+        institutionName: String(institutionName ?? '').trim() || '—',
         used: false,
         usedBy: null,
         usedAt: null,

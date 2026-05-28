@@ -76,7 +76,10 @@ export function AuthProvider({ children }) {
 
 
 
-        if (profile.role === 'admin' && profile.institutionId) {
+        if (
+          (profile.role === 'admin' || profile.role === 'adminTeacher') &&
+          profile.institutionId
+        ) {
 
           setModulesLoading(true);
 
@@ -152,7 +155,8 @@ export function AuthProvider({ children }) {
 
       isSuperAdmin: currentUserProfile?.role === 'superAdmin',
 
-      isAdmin: currentUserProfile?.role === 'admin',
+      isAdmin:
+        currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'adminTeacher',
 
       institutionId: currentUserProfile?.institutionId ?? null,
 

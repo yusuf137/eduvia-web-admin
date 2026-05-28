@@ -10,13 +10,12 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-
-export const VIDEO_LEVELS = [1, 2, 3];
+import { resolveVideoListName } from '../utils/videoListLabels';
 
 function mapVideoDoc(d) {
   const x = d.data();
   const createdAt = x.createdAt ?? null;
-  return {
+  const mapped = {
     id: d.id,
     institutionId: String(x.institutionId ?? ''),
     title: String(x.title ?? ''),
@@ -24,6 +23,8 @@ function mapVideoDoc(d) {
     url: String(x.url ?? ''),
     branch: String(x.branch ?? ''),
     level: Number(x.level ?? 1) || 1,
+    listName: String(x.listName ?? '').trim(),
+    listDescription: String(x.listDescription ?? '').trim(),
     songName: String(x.songName ?? ''),
     createdBy: String(x.createdBy ?? ''),
     createdByName: String(x.createdByName ?? ''),
@@ -33,6 +34,10 @@ function mapVideoDoc(d) {
       ? createdAt.toDate().toLocaleString('tr-TR')
       : '—',
     isActive: x.isActive !== false,
+  };
+  return {
+    ...mapped,
+    listName: resolveVideoListName(mapped),
   };
 }
 
@@ -91,7 +96,8 @@ export async function createVideo({
   description,
   url,
   branch,
-  level,
+  listName,
+  listDescription,
   songName,
   institutionId,
   createdBy,
@@ -113,7 +119,9 @@ export async function createVideo({
     description: String(description ?? '').trim(),
     url: String(url ?? '').trim(),
     branch: String(branch ?? '').trim().toLowerCase(),
-    level: Math.min(3, Math.max(1, Math.trunc(Number(level) || 1))),
+    listName: String(listName ?? '').trim() || 'Genel Liste',
+    listDescription: String(listDescription ?? '').trim(),
+    level: 1,
     songName: String(songName ?? '').trim(),
     createdBy: uid,
     createdByName: String(createdByName ?? '').trim(),
@@ -170,10 +178,15 @@ export async function updateVideo(videoId, payload, callerInstitutionId) {
       payload.branch !== undefined
         ? String(payload.branch).trim().toLowerCase()
         : String(existing.branch ?? ''),
-    level:
-      payload.level !== undefined
-        ? Math.min(3, Math.max(1, Math.trunc(Number(payload.level) || 1)))
-        : Number(existing.level) || 1,
+    listName:
+      payload.listName !== undefined
+        ? String(payload.listName).trim() || 'Genel Liste'
+        : resolveVideoListName(existing),
+    listDescription:
+      payload.listDescription !== undefined
+        ? String(payload.listDescription).trim()
+        : String(existing.listDescription ?? ''),
+    level: Number(existing.level) || 1,
     songName:
       payload.songName !== undefined ? String(payload.songName).trim() : String(existing.songName ?? ''),
     createdBy: existing.createdBy,
@@ -188,7 +201,7 @@ export async function updateVideo(videoId, payload, callerInstitutionId) {
     description: updateData.description,
     url: updateData.url,
     branch: updateData.branch,
-    level: updateData.level,
+    listName: updateData.listName,
     songName: updateData.songName,
     isActive: updateData.isActive,
   });

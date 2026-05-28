@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { auth } from '../../firebase/firebaseConfig';
 import {
-  VIDEO_LEVELS,
   fetchVideoLibrary,
   createVideo,
   updateVideo,
   deactivateVideo,
 } from '../../services/videoService';
+import { formatVideoListMeta } from '../../utils/videoListLabels';
 
 const ACTIVE_FILTERS = [
   { key: 'all', label: 'Tümü' },
@@ -21,7 +21,8 @@ const emptyForm = () => ({
   url: '',
   branch: '',
   songName: '',
-  level: 1,
+  listName: '',
+  listDescription: '',
 });
 
 export default function VideoLibraryPage() {
@@ -87,7 +88,8 @@ export default function VideoLibraryPage() {
       url: video.url,
       branch: video.branch,
       songName: video.songName,
-      level: video.level,
+      listName: video.listName,
+      listDescription: video.listDescription,
     });
     setModalOpen(true);
   };
@@ -116,7 +118,8 @@ export default function VideoLibraryPage() {
             description: form.description,
             url: form.url,
             branch: form.branch,
-            level: form.level,
+            listName: form.listName,
+            listDescription: form.listDescription,
             songName: form.songName,
             isActive: true,
           },
@@ -129,7 +132,8 @@ export default function VideoLibraryPage() {
           description: form.description,
           url: form.url,
           branch: form.branch,
-          level: form.level,
+          listName: form.listName,
+          listDescription: form.listDescription,
           songName: form.songName,
           institutionId,
           createdBy: adminUid,
@@ -202,10 +206,7 @@ export default function VideoLibraryPage() {
                   {v.isActive ? 'Aktif' : 'Pasif'}
                 </span>
               </div>
-              <p className="video-card__meta">
-                {v.branch || '—'} · Kademe {v.level}
-                {v.songName ? ` · ${v.songName}` : ''}
-              </p>
+              <p className="video-card__meta">{formatVideoListMeta(v)}</p>
               {v.description ? <p className="video-card__desc">{v.description}</p> : null}
               <p className="muted video-card__date">{v.createdAtLabel}</p>
               <div className="video-card__actions">
@@ -284,16 +285,21 @@ export default function VideoLibraryPage() {
               />
             </label>
             <label>
-              Kademe
-              <select
-                value={form.level}
-                onChange={(e) => setForm((f) => ({ ...f, level: Number(e.target.value) }))}>
-                {VIDEO_LEVELS.map((lv) => (
-                  <option key={lv} value={lv}>
-                    Kademe {lv}
-                  </option>
-                ))}
-              </select>
+              Liste Adı *
+              <input
+                value={form.listName}
+                onChange={(e) => setForm((f) => ({ ...f, listName: e.target.value }))}
+                placeholder="Örn. Başlangıç Egzersizleri"
+                required
+              />
+            </label>
+            <label>
+              Liste Açıklaması
+              <textarea
+                rows={2}
+                value={form.listDescription}
+                onChange={(e) => setForm((f) => ({ ...f, listDescription: e.target.value }))}
+              />
             </label>
             <div className="modal-card__actions">
               <button type="button" className="btn btn--ghost" onClick={closeModal}>

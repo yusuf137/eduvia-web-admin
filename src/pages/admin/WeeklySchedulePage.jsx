@@ -63,9 +63,13 @@ export default function WeeklySchedulePage() {
       .then((list) => {
         if (!cancelled) {
           setTeachers(list);
-          if (list.length && !selectedTeacherId) {
-            setSelectedTeacherId(list[0].id);
-          }
+          setSelectedTeacherId((prev) => {
+            const stillValid = prev && list.some((t) => String(t.id) === String(prev));
+            if (stillValid) {
+              return prev;
+            }
+            return list[0]?.id ? String(list[0].id) : '';
+          });
         }
       })
       .catch((e) => {
@@ -129,9 +133,16 @@ export default function WeeklySchedulePage() {
   }, [loadSchedule]);
 
   const selectedTeacher = useMemo(
-    () => teachers.find((t) => t.id === selectedTeacherId) ?? null,
+    () => teachers.find((t) => String(t.id) === String(selectedTeacherId)) ?? null,
     [teachers, selectedTeacherId],
   );
+
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('SELECTED TEACHER ID:', selectedTeacherId);
+    // eslint-disable-next-line no-console
+    console.log('SELECTED TEACHER:', selectedTeacher);
+  }, [selectedTeacherId, selectedTeacher]);
 
   const effectiveLessons = useMemo(
     () =>
@@ -147,6 +158,13 @@ export default function WeeklySchedulePage() {
 
   const gridMap = useMemo(() => buildScheduleGridMap(effectiveLessons), [effectiveLessons]);
 
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('EFFECTIVE LESSONS:', effectiveLessons.length, effectiveLessons);
+    // eslint-disable-next-line no-console
+    console.log('GRID MAP SIZE:', gridMap.size);
+  }, [effectiveLessons, gridMap]);
+
   const isCurrentWeek = weekStartDate === weekStartDateMondayLocal();
 
   return (
@@ -158,7 +176,12 @@ export default function WeeklySchedulePage() {
           Öğretmen
           <select
             value={selectedTeacherId}
-            onChange={(e) => setSelectedTeacherId(e.target.value)}
+            onChange={(e) => {
+              const nextId = e.target.value;
+              // eslint-disable-next-line no-console
+              console.log('SELECTED TEACHER ID:', nextId);
+              setSelectedTeacherId(nextId);
+            }}
             disabled={loadingTeachers || teachers.length === 0}>
             <option value="">Seçin</option>
             {teachers.map((t) => (

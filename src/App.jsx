@@ -93,7 +93,8 @@ function RequireAdmin() {
     );
   }
 
-  if (currentUserProfile?.role !== 'admin') {
+  const adminPanelRole = currentUserProfile?.role;
+  if (adminPanelRole !== 'admin' && adminPanelRole !== 'adminTeacher') {
     return <Navigate to="/unauthorized" replace />;
   }
   if (!currentUserProfile?.institutionId) {
@@ -139,10 +140,10 @@ function HomeRedirect() {
   if (currentUserProfile.role === 'superAdmin') {
     return <Navigate to="/superadmin" replace />;
   }
-  if (currentUserProfile.role === 'admin') {
-    if (!currentUserProfile.institutionId) {
-      return <Navigate to="/unauthorized" replace />;
-    }
+  if (
+    (currentUserProfile.role === 'admin' || currentUserProfile.role === 'adminTeacher') &&
+    currentUserProfile.institutionId
+  ) {
     if (subdomain && tenantInstitution && currentUserProfile.institutionId !== tenantInstitution.id) {
       return (
         <Navigate

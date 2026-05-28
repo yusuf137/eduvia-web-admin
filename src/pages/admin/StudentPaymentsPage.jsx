@@ -9,6 +9,13 @@ import {
   createPaymentReminderNotification,
 } from '../../services/paymentService';
 import { listActiveStudentsForLessons } from '../../services/userService';
+import ReceiptModal from '../../components/ReceiptModal';
+import {
+  normalizePaymentForReceipt,
+  paymentRowFromReceiptResult,
+  printReceipt,
+  resolveInstitutionForReceipt,
+} from '../../services/receiptPrintService';
 
 export default function StudentPaymentsPage() {
   const { currentUserProfile } = useAuth();
@@ -27,6 +34,7 @@ export default function StudentPaymentsPage() {
   const [saving, setSaving] = useState(false);
   const [bulkSending, setBulkSending] = useState(false);
   const [notifyingId, setNotifyingId] = useState('');
+  const [receiptPayment, setReceiptPayment] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!institutionId) {
@@ -112,6 +120,13 @@ export default function StudentPaymentsPage() {
         monthKey,
       });
       setSuccess(`Ödeme alındı. Makbuz: ${receipt.receiptNo}`);
+      setReceiptPayment(
+        paymentRowFromReceiptResult(
+          { ...receipt, receivedByName: receipt.receivedByName || currentUserProfile?.name },
+          institutionId,
+          currentUserProfile?.name ?? '',
+        ),
+      );
       setAmount('');
       setSelectedId('');
       await loadData();
@@ -144,6 +159,27 @@ export default function StudentPaymentsPage() {
       setSuccess(`${ok} öğrenciye ödeme hatırlatma bildirimi yazıldı.`);
     } finally {
       setBulkSending(false);
+    }
+  };
+
+  const openReceipt = (payment) => {
+    setReceiptPayment(payment);
+  };
+
+  const onPrintReceipt = async (payment) => {
+    try {
+      const institution = await resolveInstitutionForReceipt(
+        institutionId,
+        currentUserProfile?.institutionName ?? 'Kurum',
+      );
+      printReceipt(
+        normalizePaymentForReceipt(payment, {
+          receivedByFallback: currentUserProfile?.name ?? '',
+        }),
+        institution,
+      );
+    } catch (e) {
+      setError(e?.message ?? 'Makbuz yazdırılamadı.');
     }
   };
 
@@ -289,6 +325,7 @@ export default function StudentPaymentsPage() {
                   <th>Makbuz</th>
                   <th>Tarih</th>
                   <th>Alan</th>
+                  <th>İşlem</th>
                 </tr>
               </thead>
               <tbody>
@@ -301,6 +338,22 @@ export default function StudentPaymentsPage() {
                     </td>
                     <td>{p.dateLabel}</td>
                     <td>{p.receivedByName || '—'}</td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => openReceipt(p)}>
+                          Makbuzu Görüntüle
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => void onPrintReceipt(p)}>
+                          Yazdır
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -308,6 +361,42 @@ export default function StudentPaymentsPage() {
           </div>
         )}
       </div>
+
+      {filterPaymentsByMonthLocal(payments, monthKey).length > 0 ? (
+      <div className="payments-receipt-cards">
+        {filterPaymentsByMonthLocal(payments, monthKey).map((p) => (
+          <article key={`card-${p.id}`} className="payment-receipt-card">
+            <div className="payment-receipt-card__head">
+              <strong>{p.studentName}</strong>
+              <span>{p.amount} ₺</span>
+            </div>
+            <p className="muted">
+              Makbuz: <code className="code-pill">{p.receiptNo}</code>
+            </p>
+            <p className="muted">
+              {p.dateLabel} · {p.receivedByName || '—'}
+            </p>
+            <div className="table-actions">
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => openReceipt(p)}>
+                Makbuzu Görüntüle
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => void onPrintReceipt(p)}>
+                Yazdır
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+      ) : null}
+
+      <ReceiptModal
+        open={Boolean(receiptPayment)}
+        payment={receiptPayment}
+        institutionId={institutionId}
+        institutionName={currentUserProfile?.institutionName ?? 'Kurum'}
+        receivedByFallback={currentUserProfile?.name ?? ''}
+        onClose={() => setReceiptPayment(null)}
+      />
     </div>
   );
 }

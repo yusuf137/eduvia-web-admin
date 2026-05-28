@@ -1879,3 +1879,292 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+/* Users management (students / teachers) */
+.users-page__toolbar {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.users-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.users-page__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.users-page__search {
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.users-page__cards {
+  display: none;
+}
+
+.user-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.user-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.user-card__head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.user-card__actions {
+  margin-top: 12px;
+}
+
+.user-modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.user-modal input,
+.user-modal textarea,
+.user-modal select {
+  font-weight: 400;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  font-weight: 500 !important;
+}
+
+.weekday-fieldset {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.weekday-fieldset legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.weekday-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.weekday-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.invite-code-display {
+  font-weight: 600;
+  margin: 8px 0 0;
+}
+
+.confirm-modal__message {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .users-page__table {
+    display: none;
+  }
+
+  .users-page__cards {
+    display: block;
+  }
+}
+
+/* Receipt modal & preview */
+.receipt-modal {
+  max-width: 640px;
+  width: 100%;
+}
+
+.receipt-modal__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.receipt-modal__toolbar h3 {
+  margin: 0;
+}
+
+.receipt-preview {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  background: #fff;
+  margin-bottom: 16px;
+}
+
+.receipt-preview__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.receipt-preview__title {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+}
+
+.receipt-preview__org {
+  margin: 0 0 4px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.receipt-preview__muted {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.receipt-preview__meta {
+  text-align: right;
+  font-size: 0.9rem;
+}
+
+.receipt-preview__meta p {
+  margin: 0 0 8px;
+}
+
+.receipt-preview__rows {
+  margin: 0;
+}
+
+.receipt-preview__rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.receipt-preview__rows dt {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+
+.receipt-preview__rows dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.receipt-preview__amount {
+  font-size: 1.35rem;
+}
+
+.receipt-preview__note {
+  margin: 16px 0 0;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.receipt-preview__footer {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.payments-receipt-cards {
+  display: none;
+}
+
+.payment-receipt-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.payment-receipt-card__head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+  .payments-page .table-wrap {
+    display: none;
+  }
+
+  .payments-receipt-cards {
+    display: block;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #receipt-print-area,
+  #receipt-print-area * {
+    visibility: visible;
+  }
+
+  #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

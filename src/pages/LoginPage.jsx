@@ -22,7 +22,7 @@ function resolvePostLogin(profile, { subdomain, tenantInstitution }) {
     if (!tenantInstitution) {
       return { ok: false, message: 'Bu subdomain\'e ait kurum bulunamadı.' };
     }
-    if (profile.role !== 'admin') {
+    if (profile.role !== 'admin' && profile.role !== 'adminTeacher') {
       return { ok: false, message: 'Bu panel yalnızca kurum yöneticileri içindir.' };
     }
     if (profile.institutionId !== tenantInstitution.id) {
@@ -34,7 +34,10 @@ function resolvePostLogin(profile, { subdomain, tenantInstitution }) {
   if (profile.role === 'superAdmin') {
     return { ok: true, to: '/superadmin' };
   }
-  if (profile.role === 'admin' && profile.institutionId) {
+  if (
+    (profile.role === 'admin' || profile.role === 'adminTeacher') &&
+    profile.institutionId
+  ) {
     return { ok: true, to: '/admin' };
   }
   return { ok: false, message: 'Bu hesap web panele erişemez.' };
