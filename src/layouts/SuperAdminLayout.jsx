@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, KeyRound, LayoutDashboard, PlusCircle } from 'lucide-react';
+import { Building2, ClipboardList, FileText, KeyRound, LayoutDashboard, PlusCircle } from 'lucide-react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
@@ -9,6 +9,7 @@ const MENU = [
   { to: '/superadmin/institutions/create', label: 'Kurum Oluştur', icon: PlusCircle },
   { to: '/superadmin/invite-codes', label: 'Admin Davet Kodları', icon: KeyRound },
   { to: '/superadmin/demo-requests', label: 'Demo Talepleri', icon: ClipboardList },
+  { to: '/superadmin/legal-documents', label: 'Yasal Metinler', icon: FileText },
 ];
 
 const TITLES = {
@@ -17,6 +18,7 @@ const TITLES = {
   '/superadmin/institutions/create': 'Kurum Oluştur',
   '/superadmin/invite-codes': 'Admin Davet Kodları',
   '/superadmin/demo-requests': 'Demo Talepleri',
+  '/superadmin/legal-documents': 'Yasal Metinler',
 };
 
 export default function SuperAdminLayout() {

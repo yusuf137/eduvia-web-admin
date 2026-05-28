@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoadingScreen from './components/LoadingScreen';
 import AdminLayout from './layouts/AdminLayout';
@@ -25,6 +25,13 @@ import InviteCodesPage from './pages/admin/InviteCodesPage';
 import { AdminModulePage, AdminPathGuard, AdminRequestsGuard } from './components/AdminRouteGuard';
 import { useSubdomainInstitution } from './hooks/useSubdomainInstitution';
 import { logout } from './services/authService';
+import LegalDocumentPublicPage from './pages/public/LegalDocumentPublicPage';
+import LegalDocumentsPage from './pages/superadmin/LegalDocumentsPage';
+import {
+  isLegalPublicPath,
+  LEGAL_DOCUMENT_IDS,
+  LEGAL_PUBLIC_PATHS,
+} from './constants/legalDocuments';
 
 function RequireAuth({ children }) {
   const { loading, currentUser } = useAuth();
@@ -158,9 +165,32 @@ function HomeRedirect() {
   return <Navigate to="/unauthorized" replace />;
 }
 
+/** Wildcard / eski deploy: yasal path’leri ana sayfaya yönlendirme */
+function AppCatchAll() {
+  const { pathname } = useLocation();
+  if (isLegalPublicPath(pathname)) {
+    return <LegalDocumentPublicPage />;
+  }
+  return <Navigate to="/login" replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
+      {/* Public yasal metinler — auth gerekmez; wildcard’dan önce */}
+      <Route
+        path={LEGAL_PUBLIC_PATHS.termsOfUse}
+        element={<LegalDocumentPublicPage documentId={LEGAL_DOCUMENT_IDS.termsOfUse} />}
+      />
+      <Route
+        path={LEGAL_PUBLIC_PATHS.privacyPolicy}
+        element={<LegalDocumentPublicPage documentId={LEGAL_DOCUMENT_IDS.privacyPolicy} />}
+      />
+      <Route
+        path={LEGAL_PUBLIC_PATHS.kvkkDisclosure}
+        element={<LegalDocumentPublicPage documentId={LEGAL_DOCUMENT_IDS.kvkkDisclosure} />}
+      />
+
       <Route path="/login" element={<LoginPage />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route path="/" element={<HomeRedirect />} />
@@ -178,6 +208,7 @@ function AppRoutes() {
             <Route path="institutions/create" element={<InstitutionCreatePage />} />
             <Route path="invite-codes" element={<AdminInviteCodesPage />} />
             <Route path="demo-requests" element={<DemoRequestsPage />} />
+            <Route path="legal-documents" element={<LegalDocumentsPage />} />
           </Route>
         </Route>
 
@@ -283,7 +314,7 @@ function AppRoutes() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<AppCatchAll />} />
     </Routes>
   );
 }

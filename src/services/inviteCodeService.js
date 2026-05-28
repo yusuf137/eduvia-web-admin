@@ -126,6 +126,7 @@ export async function createAdminInviteCode(institutionId, institutionName) {
       usedAt: null,
       createdBy: uid,
       createdAt: serverTimestamp(),
+      isActive: true,
     };
 
     try {
@@ -221,6 +222,7 @@ export async function createOrgInviteCode({
         usedAt: null,
         createdBy: uid,
         createdAt: serverTimestamp(),
+        isActive: true,
       });
       return code;
     } catch (error) {

@@ -2147,6 +2147,191 @@ input {
   }
 }
 
+/* Public yasal metin sayfaları */
+.legal-public {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 42%, #f1f5f9 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+.legal-public__header {
+  padding: 20px 20px 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.legal-public__brand-link {
+  display: inline-flex;
+}
+
+.legal-public__main {
+  flex: 1;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 12px 16px 40px;
+}
+
+.legal-public__card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+  padding: 28px 24px 32px;
+}
+
+.legal-public__title {
+  margin: 0 0 8px;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.legal-public__updated {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.legal-public__state {
+  margin-top: 8px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.legal-public__state-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.legal-public__state--loading {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.legal-public__state--error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.legal-public__state--error .legal-public__state-title {
+  color: #b91c1c;
+}
+
+.legal-public__state--unpublished,
+.legal-public__state--not-found {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.legal-public__state--not-found {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.legal-public__muted,
+.legal-public__empty {
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.legal-public__empty {
+  margin: 8px 0 0;
+  font-style: italic;
+}
+
+.legal-public__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.legal-public__nav-link {
+  font-size: 0.9rem;
+  color: #4338ca;
+  text-decoration: underline;
+  padding: 6px 10px;
+}
+
+.legal-content {
+  color: #1e293b;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.legal-content__p {
+  margin: 0 0 1em;
+}
+
+.legal-content__h2 {
+  margin: 1.4em 0 0.6em;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+.legal-content__h3 {
+  margin: 1.1em 0 0.5em;
+  font-size: 1.08rem;
+  color: #0f172a;
+}
+
+.legal-content__ul {
+  margin: 0 0 1em;
+  padding-left: 1.35em;
+}
+
+.legal-content__ul li {
+  margin-bottom: 0.35em;
+}
+
+.legal-admin__tabs {
+  margin-bottom: 16px;
+}
+
+.legal-admin__form {
+  max-width: 960px;
+}
+
+.legal-admin__textarea {
+  width: 100%;
+  min-height: 360px;
+  resize: vertical;
+  line-height: 1.55;
+  font-family: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', monospace;
+  font-size: 0.92rem;
+}
+
+.legal-admin__hint {
+  margin: 0 0 4px;
+}
+
+.legal-admin__format-hint {
+  margin: -4px 0 8px;
+  font-size: 0.88rem;
+}
+
+.alert--success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+@media (max-width: 640px) {
+  .legal-public__card {
+    padding: 20px 16px 24px;
+  }
+}
+
 @media print {
   body * {
     visibility: hidden;
