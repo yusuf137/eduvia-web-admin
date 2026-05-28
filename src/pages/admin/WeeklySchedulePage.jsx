@@ -18,6 +18,7 @@ import {
   formatHoursDisplay,
   normalizeHours,
 } from '../../services/scheduleService';
+import { formatLessonPriceLabel } from '../../utils/detailFieldVisibility';
 
 function dayLabel(day) {
   return WEEKDAY_OPTIONS.find((d) => d.day === Number(day))?.label ?? String(day);
@@ -285,9 +286,7 @@ export default function WeeklySchedulePage() {
                                     {(lesson.studentNames || []).join(', ') || '—'}
                                   </div>
                                   <div className="schedule-card__price">
-                                    {lesson.pricePerLesson != null
-                                      ? `${lesson.pricePerLesson} ₺`
-                                      : '—'}
+                                    {formatLessonPriceLabel(lesson)}
                                   </div>
                                   {tags.length ? (
                                     <div className="schedule-card__tags">
@@ -346,11 +345,7 @@ export default function WeeklySchedulePage() {
               </div>
               <div>
                 <dt>Ücret</dt>
-                <dd>
-                  {detail.lesson.pricePerLesson != null
-                    ? `${detail.lesson.pricePerLesson} ₺`
-                    : '—'}
-                </dd>
+                <dd>{formatLessonPriceLabel(detail.lesson)}</dd>
               </div>
               <div>
                 <dt>Geçici</dt>
@@ -359,12 +354,6 @@ export default function WeeklySchedulePage() {
               <div>
                 <dt>Telafi</dt>
                 <dd>{detail.lesson.isMakeup || detail.lesson.lessonType === 'makeup' ? 'Evet' : 'Hayır'}</dd>
-              </div>
-              <div>
-                <dt>lessonId</dt>
-                <dd>
-                  <code className="code-pill">{detail.lesson.baseLessonId ?? detail.lesson.id}</code>
-                </dd>
               </div>
               {detail.hasConflict ? (
                 <div>

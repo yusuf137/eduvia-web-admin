@@ -156,7 +156,7 @@ export default function AdminInviteCodesPage() {
                   <td>
                     <code className="code-pill">{row.code}</code>
                   </td>
-                  <td>{row.institutionName || row.institutionId || '—'}</td>
+                  <td>{row.institutionName || '—'}</td>
                   <td>
                     <span className={`badge ${row.used ? 'badge--muted' : 'badge--ok'}`}>
                       {row.used ? 'Kullanıldı' : 'Bekliyor'}

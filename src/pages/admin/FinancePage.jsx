@@ -298,7 +298,7 @@ export default function FinancePage() {
               </p>
               <p className="muted">
                 Güncel bakiye tüm zamanların kümülatif sonucudur; ödeme, gelir ve gider işlemleri
-                `financeSettings/{institutionId}` üzerinden güncellenir.
+                kurum finans ayarları üzerinden güncellenir.
               </p>
             </div>
           ) : null}
@@ -447,9 +447,7 @@ export default function FinancePage() {
           {activeTab === 'balance' ? (
             <form className="page-card form-grid finance-form balance-form" onSubmit={onSaveBalance}>
               <h3>Manuel bakiye güncelle</h3>
-              <p className="muted">
-                Doküman: <code className="code-pill">financeSettings/{institutionId}</code>
-              </p>
+              <p className="muted">Bakiye, kurumunuzun finans ayarlarına kaydedilir.</p>
               <label>
                 Güncel bakiye (₺)
                 <input

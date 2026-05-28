@@ -171,9 +171,7 @@ export default function LessonCreatePage() {
         durationHours,
         pricePerLesson: Number(String(price).replace(',', '.')),
       });
-      setSuccess(
-        `Ders oluşturuldu (${getLessonTypeLabel(result.lessonType)}). ID: ${result.lessonId}`,
-      );
+      setSuccess(`Ders oluşturuldu (${getLessonTypeLabel(result.lessonType)}).`);
       setSelectedStudentIds([]);
       setStartHour('');
       setPrice('');

@@ -29,7 +29,6 @@ export default function InstitutionModulesEditor({
               onChange={(e) => onChange({ ...modules, [key]: e.target.checked })}
             />
             <span>{label}</span>
-            <code className="modules-editor__key">{key}</code>
           </label>
         ))}
       </div>
