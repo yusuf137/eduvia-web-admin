@@ -12,6 +12,15 @@ import {
 } from 'firebase/firestore';
 import { resolveVideoListName } from '../utils/videoListLabels';
 
+/** Aktif listede gösterilir (öğretmen kilidi / öğrenci). */
+export function isVideoDeleted(video) {
+  return Boolean(video?.deletedAt);
+}
+
+export function isVideoVisible(video) {
+  return video?.isActive !== false && !isVideoDeleted(video);
+}
+
 function mapVideoDoc(d) {
   const x = d.data();
   const createdAt = x.createdAt ?? null;
@@ -33,7 +42,10 @@ function mapVideoDoc(d) {
     createdAtLabel: createdAt?.toDate
       ? createdAt.toDate().toLocaleString('tr-TR')
       : '—',
+    updatedAt: x.updatedAt ?? null,
     isActive: x.isActive !== false,
+    deletedAt: x.deletedAt ?? null,
+    deletedBy: String(x.deletedBy ?? ''),
   };
   return {
     ...mapped,
@@ -129,9 +141,6 @@ export async function createVideo({
     isActive: true,
   };
 
-  // eslint-disable-next-line no-console
-  console.log('WEB VIDEO LIBRARY DATA:', videoData);
-
   try {
     const ref = await addDoc(collection(db, 'videoLibrary'), videoData);
     return { id: ref.id };
@@ -142,9 +151,6 @@ export async function createVideo({
   }
 }
 
-/**
- * Rules tam doküman güncellemesi ister; institutionId / createdBy / createdAt korunur.
- */
 export async function updateVideo(videoId, payload, callerInstitutionId) {
   const id = String(videoId ?? '').trim();
   const callerInst = String(callerInstitutionId ?? '').trim();
@@ -164,6 +170,9 @@ export async function updateVideo(videoId, payload, callerInstitutionId) {
   }
   if (callerInst && callerInst !== inst) {
     throw new Error('Bu video başka kuruma ait; düzenlenemez.');
+  }
+  if (existing.deletedAt) {
+    throw new Error('Silinmiş video düzenlenemez.');
   }
 
   const updateData = {
@@ -192,19 +201,9 @@ export async function updateVideo(videoId, payload, callerInstitutionId) {
     createdBy: existing.createdBy,
     createdByName: existing.createdByName,
     createdAt: existing.createdAt,
-    isActive: payload.isActive !== undefined ? payload.isActive === true : existing.isActive === true,
+    isActive: payload.isActive !== undefined ? payload.isActive === true : existing.isActive !== false,
+    updatedAt: serverTimestamp(),
   };
-
-  // eslint-disable-next-line no-console
-  console.log('WEB VIDEO UPDATE DATA:', {
-    title: updateData.title,
-    description: updateData.description,
-    url: updateData.url,
-    branch: updateData.branch,
-    listName: updateData.listName,
-    songName: updateData.songName,
-    isActive: updateData.isActive,
-  });
 
   try {
     await updateDoc(ref, updateData);
@@ -219,6 +218,48 @@ export async function deactivateVideo(videoId, callerInstitutionId) {
   return updateVideo(videoId, { isActive: false }, callerInstitutionId);
 }
 
+export async function softDeleteVideo(videoId, callerInstitutionId, deletedByUid) {
+  const id = String(videoId ?? '').trim();
+  const callerInst = String(callerInstitutionId ?? '').trim();
+  const actor = String(deletedByUid ?? auth.currentUser?.uid ?? '').trim();
+  if (!id) {
+    throw new Error('Video bulunamadı.');
+  }
+  if (!actor) {
+    throw new Error('Oturum bulunamadı.');
+  }
+
+  const ref = doc(db, 'videoLibrary', id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    throw new Error('Video bulunamadı.');
+  }
+  const existing = snap.data();
+  const inst = String(existing.institutionId ?? '').trim();
+  if (!inst) {
+    throw new Error('Video kaydında kurum bilgisi yok.');
+  }
+  if (callerInst && callerInst !== inst) {
+    throw new Error('Bu video başka kuruma ait; silinemez.');
+  }
+
+  // eslint-disable-next-line no-console
+  console.log('WEB SOFT DELETE VIDEO:', id, 'institutionId:', inst);
+
+  try {
+    await updateDoc(ref, {
+      isActive: false,
+      deletedAt: serverTimestamp(),
+      deletedBy: actor,
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log('WEB VIDEO SOFT DELETE ERROR:', error.code, error.message);
+    throw error;
+  }
+}
+
 export async function fetchVideoUnlocks(institutionId) {
   const inst = String(institutionId ?? '').trim();
   if (!inst) {
@@ -229,8 +270,6 @@ export async function fetchVideoUnlocks(institutionId) {
       query(collection(db, 'videoUnlocks'), where('institutionId', '==', inst)),
     );
     const rows = sortUnlocksByUnlockedAt(snap.docs.map(mapUnlockDoc));
-    // eslint-disable-next-line no-console
-    console.log('WEB VIDEO UNLOCKS:', rows);
     return rows;
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -239,7 +278,6 @@ export async function fetchVideoUnlocks(institutionId) {
   }
 }
 
-/** unlockedAt üzerinden YYYY-MM-DD */
 export function unlockDateKey(row) {
   const ts = row?.unlockedAt;
   if (!ts?.toDate) {

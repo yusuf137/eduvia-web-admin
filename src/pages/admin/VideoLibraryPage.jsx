@@ -6,13 +6,17 @@ import {
   createVideo,
   updateVideo,
   deactivateVideo,
+  softDeleteVideo,
+  isVideoDeleted,
+  isVideoVisible,
 } from '../../services/videoService';
 import { formatVideoListMeta } from '../../utils/videoListLabels';
 
 const ACTIVE_FILTERS = [
-  { key: 'all', label: 'Tümü' },
   { key: 'active', label: 'Aktif' },
   { key: 'passive', label: 'Pasif' },
+  { key: 'deleted', label: 'Silinmiş' },
+  { key: 'all', label: 'Tümü' },
 ];
 
 const emptyForm = () => ({
@@ -35,7 +39,7 @@ export default function VideoLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState('active');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState('');
   const [form, setForm] = useState(emptyForm);
@@ -66,10 +70,13 @@ export default function VideoLibraryPage() {
 
   const displayVideos = useMemo(() => {
     if (activeFilter === 'active') {
-      return videos.filter((v) => v.isActive);
+      return videos.filter((v) => isVideoVisible(v));
     }
     if (activeFilter === 'passive') {
-      return videos.filter((v) => !v.isActive);
+      return videos.filter((v) => !isVideoDeleted(v) && !isVideoVisible(v));
+    }
+    if (activeFilter === 'deleted') {
+      return videos.filter((v) => isVideoDeleted(v));
     }
     return videos;
   }, [videos, activeFilter]);
@@ -165,6 +172,25 @@ export default function VideoLibraryPage() {
     }
   };
 
+  const onDelete = async (video) => {
+    if (
+      !window.confirm(
+        `"${video.title}" silinecek (soft delete). Geçmiş kilitleme kayıtları korunur. Devam etmek istiyor musunuz?`,
+      )
+    ) {
+      return;
+    }
+    setError('');
+    setSuccess('');
+    try {
+      await softDeleteVideo(video.id, institutionId, adminUid);
+      setSuccess('Video silindi.');
+      await loadVideos();
+    } catch (err) {
+      setError(err?.message ?? 'Video silinemedi.');
+    }
+  };
+
   return (
     <div className="page-stack video-library-page">
       <div className="page-toolbar">
@@ -202,8 +228,11 @@ export default function VideoLibraryPage() {
             <article key={v.id} className="video-card">
               <div className="video-card__head">
                 <h3 className="video-card__title">{v.title}</h3>
-                <span className={`badge ${v.isActive ? 'badge--ok' : 'badge--muted'}`}>
-                  {v.isActive ? 'Aktif' : 'Pasif'}
+                <span
+                  className={`badge ${
+                    isVideoVisible(v) ? 'badge--ok' : isVideoDeleted(v) ? 'badge--danger' : 'badge--muted'
+                  }`}>
+                  {isVideoDeleted(v) ? 'Silinmiş' : isVideoVisible(v) ? 'Aktif' : 'Pasif'}
                 </span>
               </div>
               <p className="video-card__meta">{formatVideoListMeta(v)}</p>
@@ -219,15 +248,25 @@ export default function VideoLibraryPage() {
                     Link Aç
                   </a>
                 ) : null}
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => openEdit(v)}>
-                  Düzenle
-                </button>
-                {v.isActive ? (
+                {!isVideoDeleted(v) ? (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => openEdit(v)}>
+                    Düzenle
+                  </button>
+                ) : null}
+                {!isVideoDeleted(v) && isVideoVisible(v) ? (
                   <button
                     type="button"
                     className="btn btn--ghost btn--sm"
                     onClick={() => void onDeactivate(v)}>
                     Pasif Et
+                  </button>
+                ) : null}
+                {!isVideoDeleted(v) ? (
+                  <button
+                    type="button"
+                    className="btn btn--danger btn--sm"
+                    onClick={() => void onDelete(v)}>
+                    Sil
                   </button>
                 ) : null}
               </div>
