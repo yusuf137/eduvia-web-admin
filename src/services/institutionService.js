@@ -54,6 +54,8 @@ function mapInstitutionDoc(d) {
   const data = d.data();
   const createdAt = data.createdAt ?? null;
   const modules = normalizeModules(data.modules);
+  const plan = String(data.plan ?? '').trim();
+  const planName = String(data.planName ?? '').trim();
   return {
     id: d.id,
     name: String(data.name ?? ''),
@@ -63,6 +65,8 @@ function mapInstitutionDoc(d) {
     city: String(data.city ?? ''),
     address: String(data.address ?? ''),
     isActive: data.isActive !== false,
+    plan: plan || null,
+    planName: planName || null,
     modules,
     createdAt,
     createdBy: data.createdBy ?? null,
@@ -218,7 +222,7 @@ export async function isSlugTaken(slug) {
 }
 
 export async function createInstitution(
-  { name, slug, phone, email, city, address, isActive = true, modules },
+  { name, slug, phone, email, city, address, isActive = true, plan, planName, modules },
   { currentUserProfile } = {},
 ) {
   const uid = auth.currentUser?.uid;
@@ -266,6 +270,9 @@ export async function createInstitution(
     throw error;
   }
 
+  const cleanPlan = String(plan ?? 'standard').trim() || 'standard';
+  const cleanPlanName = String(planName ?? '').trim() || cleanPlan;
+
   const institutionData = {
     name: cleanName,
     slug: cleanSlug,
@@ -274,6 +281,8 @@ export async function createInstitution(
     city: String(city ?? '').trim(),
     address: String(address ?? '').trim(),
     isActive: isActive !== false,
+    plan: cleanPlan,
+    planName: cleanPlanName,
     modules: modulesPayload,
     createdBy: uid,
     createdAt: serverTimestamp(),
@@ -326,26 +335,41 @@ export async function createInstitution(
 }
 
 export async function updateInstitutionModules(institutionId, modules) {
+  return updateInstitutionPlanAndModules(institutionId, { modules });
+}
+
+export async function updateInstitutionPlanAndModules(
+  institutionId,
+  { plan, planName, modules },
+) {
   const id = String(institutionId ?? '').trim();
   if (!id) {
     throw new Error('Kurum kimliği gerekli.');
   }
 
-  const modulesPayload = buildModulesPayload(modules);
   const updateData = {
-    modules: modulesPayload,
     updatedAt: serverTimestamp(),
   };
 
+  if (modules != null) {
+    updateData.modules = buildModulesPayload(modules);
+  }
+  if (plan != null) {
+    updateData.plan = String(plan).trim() || 'custom';
+  }
+  if (planName != null) {
+    updateData.planName = String(planName).trim();
+  }
+
   // eslint-disable-next-line no-console
-  console.log('WEB INSTITUTION UPDATE MODULES:', updateData);
+  console.log('WEB INSTITUTION UPDATE PLAN/MODULES:', updateData);
 
   try {
     await updateDoc(doc(db, 'institutions', id), updateData);
-    return { id, modules: modulesPayload };
+    return { id, ...updateData };
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.log('WEB INSTITUTION MODULE UPDATE ERROR:', error.code, error.message);
+    console.log('WEB INSTITUTION PLAN/MODULE UPDATE ERROR:', error.code, error.message);
     throw error;
   }
 }

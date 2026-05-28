@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import InstitutionEditModulesModal from '../../components/superadmin/InstitutionEditModulesModal';
 import { formatModulesSummary } from '../../constants/institutionModules';
+import {
+  getPlanDisplayLabel,
+  isCustomModuleOverride,
+  resolveInstitutionPlan,
+} from '../../config/packagePresets';
 import { listInstitutions } from '../../services/institutionService';
 import { getInstitutionPanelHost, getInstitutionPanelUrl } from '../../utils/subdomain';
 
@@ -84,13 +89,20 @@ export default function InstitutionsPage() {
         </div>
       ) : (
         <div className="data-grid">
-          {rows.map((item) => (
+          {rows.map((item) => {
+            const { plan } = resolveInstitutionPlan(item);
+            const planLabel = getPlanDisplayLabel(item);
+            const customized = isCustomModuleOverride(plan, item.modules);
+            return (
             <article key={item.id} className="data-card">
               <div className="data-card__head">
                 <h3>{item.name || '—'}</h3>
-                <span className={`badge ${item.isActive ? 'badge--ok' : 'badge--muted'}`}>
-                  {item.isActive ? 'Aktif' : 'Pasif'}
-                </span>
+                <div className="data-card__badges">
+                  <span className={`badge ${item.isActive ? 'badge--ok' : 'badge--muted'}`}>
+                    {item.isActive ? 'Aktif' : 'Pasif'}
+                  </span>
+                  {customized ? <span className="badge badge--accent">Özelleştirilmiş</span> : null}
+                </div>
               </div>
               <dl className="data-card__meta">
                 <div>
@@ -114,6 +126,10 @@ export default function InstitutionsPage() {
                   <dd>{item.city || '—'}</dd>
                 </div>
                 <div>
+                  <dt>Paket</dt>
+                  <dd>{planLabel}</dd>
+                </div>
+                <div>
                   <dt>Modüller</dt>
                   <dd>{formatModulesSummary(item.modules)}</dd>
                 </div>
@@ -127,11 +143,12 @@ export default function InstitutionsPage() {
                   type="button"
                   className="btn btn--ghost"
                   onClick={() => setEditInstitution(item)}>
-                  Özellikleri Düzenle
+                  Paket ve Özellikleri Düzenle
                 </button>
               </div>
             </article>
-          ))}
+          );
+          })}
         </div>
       )}
 

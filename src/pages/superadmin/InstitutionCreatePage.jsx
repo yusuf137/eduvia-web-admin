@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import InstitutionModulesEditor from '../../components/InstitutionModulesEditor';
+import PackageSelector from '../../components/PackageSelector';
 import { useAuth } from '../../contexts/AuthContext';
-import { DEFAULT_MODULES, normalizeModules } from '../../constants/institutionModules';
+import {
+  applyPresetModules,
+  getPackagePreset,
+  isCustomModuleOverride,
+} from '../../config/packagePresets';
 import {
   createInstitution,
   slugifyInstitutionName,
@@ -32,11 +37,31 @@ export default function InstitutionCreatePage() {
   const navigate = useNavigate();
   const { currentUser, currentUserProfile, loading: authLoading } = useAuth();
   const [form, setForm] = useState(EMPTY);
-  const [modules, setModules] = useState(() => normalizeModules(DEFAULT_MODULES));
+  const [plan, setPlan] = useState('standard');
+  const [modules, setModules] = useState(() => applyPresetModules('standard'));
+  const [modulesCustomized, setModulesCustomized] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const planPreset = useMemo(() => getPackagePreset(plan), [plan]);
+  const hasModuleOverride = useMemo(
+    () => modulesCustomized || isCustomModuleOverride(plan, modules),
+    [modulesCustomized, plan, modules],
+  );
+
+  const onPlanSelect = (planKey) => {
+    const preset = getPackagePreset(planKey);
+    setPlan(planKey);
+    setModules({ ...preset.modules });
+    setModulesCustomized(false);
+  };
+
+  const onModulesChange = (next) => {
+    setModules(next);
+    setModulesCustomized(isCustomModuleOverride(plan, next));
+  };
 
   const onNameChange = (name) => {
     setForm((prev) => ({
@@ -67,6 +92,8 @@ export default function InstitutionCreatePage() {
         {
           ...form,
           isActive: true,
+          plan,
+          planName: planPreset.name,
           modules,
         },
         { currentUserProfile },
@@ -97,7 +124,7 @@ export default function InstitutionCreatePage() {
       {error ? <div className="alert alert--error">{error}</div> : null}
       {success ? <div className="alert alert--success">{success}</div> : null}
 
-      <form className="page-card form-grid" onSubmit={onSubmit}>
+      <form className="page-card form-grid institution-form" onSubmit={onSubmit}>
         <label>
           Kurum adı *
           <input
@@ -163,7 +190,25 @@ export default function InstitutionCreatePage() {
         </label>
 
         <div className="form-grid__full">
-          <InstitutionModulesEditor modules={modules} onChange={setModules} disabled={submitting} />
+          <PackageSelector selectedPlan={plan} onSelect={onPlanSelect} disabled={submitting} />
+          <div className="alert alert--info package-info-banner">
+            Seçilen pakete göre modüller otomatik ayarlandı. İsterseniz aşağıdan ek özellikleri manuel
+            olarak değiştirebilirsiniz.
+          </div>
+          {hasModuleOverride ? (
+            <div className="alert alert--warn package-info-banner">
+              Bu kurumda paket dışında özel modül ayarı bulunuyor.
+            </div>
+          ) : null}
+        </div>
+
+        <div className="form-grid__full">
+          <InstitutionModulesEditor
+            modules={modules}
+            onChange={onModulesChange}
+            disabled={submitting}
+            legend="Ek Özellikler / Modül Ayarları"
+          />
         </div>
 
         <label className="form-grid__checkbox">
