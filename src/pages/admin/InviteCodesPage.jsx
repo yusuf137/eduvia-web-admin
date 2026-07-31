@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import {
   ORG_INVITE_ROLES,
   createOrgInviteCode,
@@ -17,6 +18,7 @@ function formatDate(ts) {
 
 export default function InviteCodesPage() {
   const { currentUserProfile } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
   const institutionName = currentUserProfile?.institutionName ?? '';
 
@@ -68,6 +70,9 @@ export default function InviteCodesPage() {
   }, [rows, roleFilter, usedFilter]);
 
   const onCreate = async () => {
+    if (!ensureAllowed()) {
+      return;
+    }
     setError('');
     setSuccess('');
     setCreating(true);
@@ -81,7 +86,8 @@ export default function InviteCodesPage() {
       setSuccess(`Davet kodu oluşturuldu: ${code}`);
       await loadCodes();
     } catch (e) {
-      setError(e?.message ?? 'Kod oluşturulamadı.');
+      const msg = resolveActionError(e, 'Kod oluşturulamadı.');
+      if (msg) setError(msg);
     } finally {
       setCreating(false);
     }

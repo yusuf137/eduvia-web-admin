@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import { auth } from '../../firebase/firebaseConfig';
 import { fetchPayments } from '../../services/paymentService';
 import { filterPaymentsByMonth } from '../../services/financeService';
@@ -28,6 +29,7 @@ function formatMoney(n) {
 
 export default function FinancePage() {
   const { currentUserProfile } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
   const adminUid = auth.currentUser?.uid ?? '';
 
@@ -144,6 +146,9 @@ export default function FinancePage() {
 
   const onAddIncome = async (e) => {
     e.preventDefault();
+    if (!ensureAllowed()) {
+      return;
+    }
     setSavingIncome(true);
     setError('');
     setSuccess('');
@@ -162,7 +167,8 @@ export default function FinancePage() {
       setIncomeAmount('');
       await loadAll();
     } catch (err) {
-      setError(err?.message ?? 'Gelir eklenemedi.');
+      const msg = resolveActionError(err, 'Gelir eklenemedi.');
+      if (msg) setError(msg);
     } finally {
       setSavingIncome(false);
     }
@@ -170,6 +176,9 @@ export default function FinancePage() {
 
   const onAddExpense = async (e) => {
     e.preventDefault();
+    if (!ensureAllowed()) {
+      return;
+    }
     setSavingExpense(true);
     setError('');
     setSuccess('');
@@ -188,7 +197,8 @@ export default function FinancePage() {
       setExpAmount('');
       await loadAll();
     } catch (err) {
-      setError(err?.message ?? 'Gider eklenemedi.');
+      const msg = resolveActionError(err, 'Gider eklenemedi.');
+      if (msg) setError(msg);
     } finally {
       setSavingExpense(false);
     }
@@ -196,6 +206,9 @@ export default function FinancePage() {
 
   const onSaveBalance = async (e) => {
     e.preventDefault();
+    if (!ensureAllowed()) {
+      return;
+    }
     setSavingBalance(true);
     setError('');
     setSuccess('');
@@ -208,7 +221,8 @@ export default function FinancePage() {
       setSuccess('Bakiye güncellendi.');
       await loadAll();
     } catch (err) {
-      setError(err?.message ?? 'Bakiye güncellenemedi.');
+      const msg = resolveActionError(err, 'Bakiye güncellenemedi.');
+      if (msg) setError(msg);
     } finally {
       setSavingBalance(false);
     }

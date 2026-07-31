@@ -50,6 +50,16 @@ function balanceRef(institutionId) {
   return doc(db, 'financeSettings', String(institutionId).trim());
 }
 
+function financeSettingsWritePayload(currentBalance, existingSnap) {
+  const prev = existingSnap?.exists?.() ? existingSnap.data() ?? {} : {};
+  return {
+    currentBalance,
+    lastManualUpdateAt: prev.lastManualUpdateAt ?? null,
+    lastManualUpdateBy: prev.lastManualUpdateBy ?? null,
+    updatedAt: serverTimestamp(),
+  };
+}
+
 function mapIncomeDoc(d) {
   const data = d.data();
   const dateStr = String(data.date ?? '').slice(0, 10);
@@ -205,11 +215,7 @@ export async function addIncome({
       const current = bSnap.exists() ? Number(bSnap.data()?.currentBalance ?? 0) : 0;
       const incomeRef = doc(collection(db, 'incomes'));
       transaction.set(incomeRef, incomeData);
-      transaction.set(
-        bRef,
-        { currentBalance: current + Number(amount), updatedAt: serverTimestamp() },
-        { merge: true },
-      );
+      transaction.set(bRef, financeSettingsWritePayload(current + Number(amount), bSnap));
     });
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -252,11 +258,7 @@ export async function addExpense({
       const current = bSnap.exists() ? Number(bSnap.data()?.currentBalance ?? 0) : 0;
       const expenseRef = doc(collection(db, 'expenses'));
       transaction.set(expenseRef, expenseData);
-      transaction.set(
-        bRef,
-        { currentBalance: current - Number(amount), updatedAt: serverTimestamp() },
-        { merge: true },
-      );
+      transaction.set(bRef, financeSettingsWritePayload(current - Number(amount), bSnap));
     });
   } catch (error) {
     // eslint-disable-next-line no-console

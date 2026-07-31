@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import { listBranches } from '../../services/branchService';
 import {
   getLessonTypeLabel,
@@ -19,6 +20,7 @@ const FALLBACK_BRANCHES = ['Piyano', 'Gitar', 'Keman', 'Flüt', 'Şan', 'Solfej'
 
 export default function LessonCreatePage() {
   const { currentUserProfile } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
 
   const [teachers, setTeachers] = useState([]);
@@ -158,6 +160,9 @@ export default function LessonCreatePage() {
       setError('Lütfen en az bir öğrenci seçin.');
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
 
     setSaving(true);
     try {
@@ -176,7 +181,8 @@ export default function LessonCreatePage() {
       setStartHour('');
       setPrice('');
     } catch (err) {
-      setError(err?.message ?? 'Ders oluşturulamadı.');
+      const msg = resolveActionError(err, 'Ders oluşturulamadı.');
+      if (msg) setError(msg);
     } finally {
       setSaving(false);
     }

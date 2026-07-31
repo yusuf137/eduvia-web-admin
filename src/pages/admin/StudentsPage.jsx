@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import { auth } from '../../firebase/firebaseConfig';
 import ActiveFilterBar from '../../components/ActiveFilterBar';
 import ConfirmModal from '../../components/admin/ConfirmModal';
@@ -27,6 +28,7 @@ const emptyEditForm = () => ({
 
 export default function StudentsPage() {
   const { currentUserProfile } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
   const institutionName = currentUserProfile?.institutionName ?? '';
   const callerRole = currentUserProfile?.role ?? '';
@@ -114,6 +116,9 @@ export default function StudentsPage() {
     if (!editUser) {
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
     setBusy(true);
     setError('');
     setSuccess('');
@@ -134,13 +139,17 @@ export default function StudentsPage() {
       closeEdit();
       await loadStudents();
     } catch (err) {
-      setError(err?.message ?? 'Güncelleme başarısız.');
+      const msg = resolveActionError(err, 'Güncelleme başarısız.');
+      if (msg) setError(msg);
     } finally {
       setBusy(false);
     }
   };
 
   const onCreateInvite = async () => {
+    if (!ensureAllowed()) {
+      return;
+    }
     setBusy(true);
     setError('');
     setSuccess('');
@@ -156,7 +165,8 @@ export default function StudentsPage() {
       setInviteCode(code);
       setSuccess(`Öğrenci davet kodu oluşturuldu: ${code}`);
     } catch (err) {
-      setError(err?.message ?? 'Davet kodu oluşturulamadı.');
+      const msg = resolveActionError(err, 'Davet kodu oluşturulamadı.');
+      if (msg) setError(msg);
     } finally {
       setBusy(false);
     }
@@ -164,6 +174,9 @@ export default function StudentsPage() {
 
   const runConfirmAction = async () => {
     if (!confirm?.user) {
+      return;
+    }
+    if (!ensureAllowed()) {
       return;
     }
     setBusy(true);
@@ -183,7 +196,8 @@ export default function StudentsPage() {
       setConfirm(null);
       await loadStudents();
     } catch (err) {
-      setError(err?.message ?? 'İşlem başarısız.');
+      const msg = resolveActionError(err, 'İşlem başarısız.');
+      if (msg) setError(msg);
     } finally {
       setBusy(false);
     }

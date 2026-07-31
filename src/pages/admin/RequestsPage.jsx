@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import { isModuleEnabled, normalizeModules } from '../../constants/institutionModules';
 import { auth, db } from '../../firebase/firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
@@ -93,6 +94,7 @@ function RequestCard({ title, meta, status, children, actions }) {
 
 export default function RequestsPage() {
   const { currentUserProfile, institutionModules } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
   const adminUid = auth.currentUser?.uid ?? '';
 
@@ -198,6 +200,9 @@ export default function RequestsPage() {
       setError('Oturum bulunamadı.');
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
     setActingKey(key);
     setError('');
     setSuccess('');
@@ -210,7 +215,8 @@ export default function RequestsPage() {
       }
       await loadAll();
     } catch (e) {
-      setError(e?.message ?? 'İşlem başarısız.');
+      const msg = resolveActionError(e, 'İşlem başarısız.');
+      if (msg) setError(msg);
     } finally {
       setActingKey('');
     }

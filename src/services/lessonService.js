@@ -237,9 +237,11 @@ export async function createLessonForAdmin({
   startHour,
   durationHours,
   pricePerLesson,
+  isMakeup = false,
 }) {
   const inst = String(currentUserProfile?.institutionId ?? '').trim();
-  if (!inst || currentUserProfile?.role !== 'admin') {
+  const role = String(currentUserProfile?.role ?? '');
+  if (!inst || !['admin', 'adminTeacher'].includes(role)) {
     throw new Error('Yalnızca kurum admini ders oluşturabilir.');
   }
 
@@ -317,6 +319,7 @@ export async function createLessonForAdmin({
     teacherAvailableDays: teacherAvailableDaysList,
     duration: durationNum,
     pricePerLesson: price,
+    isMakeup: isMakeup === true,
     createdAt: serverTimestamp(),
   };
 
@@ -340,6 +343,7 @@ export async function createLessonForAdmin({
       day: d,
       hours: hoursList,
       institutionId: inst,
+      isMakeup: isMakeup === true,
     });
   } catch (error) {
     try {

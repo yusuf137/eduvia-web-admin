@@ -1,13 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import InstitutionModulesEditor from '../../components/InstitutionModulesEditor';
 import PackageSelector from '../../components/PackageSelector';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  applyPresetModules,
-  getPackagePreset,
-  isCustomModuleOverride,
-} from '../../config/packagePresets';
+import { isCustomModuleOverrideForPackage } from '../../utils/packageResolver';
+import { usePackages } from '../../contexts/PackageCatalogContext';
 import {
   createInstitution,
   slugifyInstitutionName,
@@ -36,31 +33,48 @@ const EMPTY = {
 export default function InstitutionCreatePage() {
   const navigate = useNavigate();
   const { currentUser, currentUserProfile, loading: authLoading } = useAuth();
+  const { activePackages, loading: packagesLoading } = usePackages();
   const [form, setForm] = useState(EMPTY);
-  const [plan, setPlan] = useState('standard');
-  const [modules, setModules] = useState(() => applyPresetModules('standard'));
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [modules, setModules] = useState({});
   const [modulesCustomized, setModulesCustomized] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const planPreset = useMemo(() => getPackagePreset(plan), [plan]);
-  const hasModuleOverride = useMemo(
-    () => modulesCustomized || isCustomModuleOverride(plan, modules),
-    [modulesCustomized, plan, modules],
+  const selectedPackage = useMemo(
+    () => activePackages.find((pkg) => pkg.id === selectedPackageId) ?? null,
+    [activePackages, selectedPackageId],
   );
 
-  const onPlanSelect = (planKey) => {
-    const preset = getPackagePreset(planKey);
-    setPlan(planKey);
-    setModules({ ...preset.modules });
+  useEffect(() => {
+    if (!selectedPackageId && activePackages.length) {
+      const first = activePackages[0];
+      setSelectedPackageId(first.id);
+      setModules({ ...first.modules });
+      setModulesCustomized(false);
+    }
+  }, [activePackages, selectedPackageId]);
+
+  const hasModuleOverride = useMemo(
+    () =>
+      modulesCustomized ||
+      (selectedPackage ? isCustomModuleOverrideForPackage(selectedPackage, modules) : false),
+    [modulesCustomized, selectedPackage, modules],
+  );
+
+  const onPackageSelect = (pkg) => {
+    setSelectedPackageId(pkg.id);
+    setModules({ ...pkg.modules });
     setModulesCustomized(false);
   };
 
   const onModulesChange = (next) => {
     setModules(next);
-    setModulesCustomized(isCustomModuleOverride(plan, next));
+    setModulesCustomized(
+      selectedPackage ? isCustomModuleOverrideForPackage(selectedPackage, next) : true,
+    );
   };
 
   const onNameChange = (name) => {
@@ -74,8 +88,13 @@ export default function InstitutionCreatePage() {
   const onSubmit = async (e) => {
     e.preventDefault();
 
-    if (authLoading) {
-      setError('Profil yükleniyor, lütfen bekleyin.');
+    if (authLoading || packagesLoading) {
+      setError('Veriler yükleniyor, lütfen bekleyin.');
+      return;
+    }
+
+    if (!selectedPackage) {
+      setError('Lütfen bir paket seçin.');
       return;
     }
 
@@ -92,8 +111,9 @@ export default function InstitutionCreatePage() {
         {
           ...form,
           isActive: true,
-          plan,
-          planName: planPreset.name,
+          packageId: selectedPackage.id,
+          plan: selectedPackage.slug,
+          planName: selectedPackage.name,
           modules,
         },
         { currentUserProfile },
@@ -190,7 +210,16 @@ export default function InstitutionCreatePage() {
         </label>
 
         <div className="form-grid__full">
-          <PackageSelector selectedPlan={plan} onSelect={onPlanSelect} disabled={submitting} />
+          {packagesLoading ? (
+            <p className="muted">Paketler yükleniyor…</p>
+          ) : (
+            <PackageSelector
+              packages={activePackages}
+              selectedPackageId={selectedPackageId}
+              onSelect={onPackageSelect}
+              disabled={submitting}
+            />
+          )}
           <div className="alert alert--info package-info-banner">
             Seçilen pakete göre modüller otomatik ayarlandı. İsterseniz aşağıdan ek özellikleri manuel
             olarak değiştirebilirsiniz.
@@ -222,7 +251,7 @@ export default function InstitutionCreatePage() {
         </label>
 
         <div className="form-grid__actions">
-          <button type="submit" className="btn btn--primary" disabled={submitting}>
+          <button type="submit" className="btn btn--primary" disabled={submitting || packagesLoading}>
             {submitting ? 'Kaydediliyor…' : 'Kurumu Oluştur'}
           </button>
         </div>

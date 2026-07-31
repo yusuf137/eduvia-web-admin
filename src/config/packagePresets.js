@@ -1,4 +1,12 @@
 import { DEFAULT_MODULES } from '../constants/institutionModules';
+import { formatPlanPrice as formatPlanPriceValue } from '../utils/packageFormat';
+import {
+  getPlanDisplayLabel as getPlanDisplayLabelFromCatalog,
+  isCustomModuleOverrideForPackage,
+  resolvePackageForInstitution,
+} from '../utils/packageResolver';
+
+export { formatPlanPriceValue as formatPlanPrice };
 
 /** Firestore `institutions.modules` ile uyumlu kanonik anahtarlar */
 export const CANONICAL_MODULE_KEYS = Object.keys(DEFAULT_MODULES);
@@ -144,15 +152,16 @@ export function resolveInstitutionPlan(institution) {
   return { plan, planName, preset };
 }
 
-export function formatPlanPrice(amount) {
-  if (amount == null) {
-    return 'Teklif alın';
+export function isCustomModuleOverride(planOrPackage, modules, packages = null) {
+  if (planOrPackage && typeof planOrPackage === 'object' && planOrPackage.modules) {
+    return isCustomModuleOverrideForPackage(planOrPackage, modules);
   }
-  return `${Number(amount).toLocaleString('tr-TR')} TL`;
-}
-
-export function isCustomModuleOverride(plan, modules) {
-  const preset = getPackagePreset(plan);
+  if (packages?.length) {
+    const institution = { plan: planOrPackage, modules };
+    const pkg = resolvePackageForInstitution(institution, packages);
+    return isCustomModuleOverrideForPackage(pkg, modules);
+  }
+  const preset = getPackagePreset(planOrPackage);
   const normalized = modules ?? {};
   return CANONICAL_MODULE_KEYS.some((key) => {
     const current = normalized[key] !== false;
@@ -161,7 +170,11 @@ export function isCustomModuleOverride(plan, modules) {
   });
 }
 
-export function getPlanDisplayLabel(institution) {
+/** @deprecated packages parametresi ile getPlanDisplayLabelFromCatalog kullanın */
+export function getPlanDisplayLabel(institution, packages = null) {
+  if (packages?.length) {
+    return getPlanDisplayLabelFromCatalog(institution, packages);
+  }
   const { plan, planName } = resolveInstitutionPlan(institution);
   if (!institution?.plan) {
     return institution?.planName ? planName : 'Paket seçilmemiş';

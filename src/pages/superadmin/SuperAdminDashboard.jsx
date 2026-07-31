@@ -1,16 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, KeyRound, CheckCircle, XCircle } from 'lucide-react';
+import { Building2, KeyRound, CheckCircle, XCircle, CreditCard } from 'lucide-react';
 import StatCard from '../../components/StatCard';
+import UpcomingRemindersWidget from '../../components/superadmin/dashboard/UpcomingRemindersWidget';
+import RecentActivitiesWidget from '../../components/superadmin/dashboard/RecentActivitiesWidget';
 import { listInstitutions } from '../../services/institutionService';
 import { listAdminInviteCodes } from '../../services/inviteCodeService';
+import { listUpcomingReminderNotes } from '../../services/institutionNoteService';
+import { listRecentAuditLogs } from '../../services/auditLogService';
+import {
+  bootstrapSubscriptionsFromInstitutions,
+  computeSubscriptionDashboardStats,
+  listSubscriptionPayments,
+  listSubscriptions,
+} from '../../services/subscriptionService';
 import { countQualifiedLessons, migrateQualifiedLessons } from '../../services/lessonMigrationService';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePackages } from '../../contexts/PackageCatalogContext';
 
 export default function SuperAdminDashboard() {
   const { currentUserProfile } = useAuth();
+  const { reload: reloadPackages } = usePackages();
   const [institutions, setInstitutions] = useState([]);
   const [codes, setCodes] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [subscriptionStats, setSubscriptionStats] = useState({
+    activeCount: 0,
+    expectedRevenue: 0,
+    collectedThisMonth: 0,
+    overdueCount: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [migrationMsg, setMigrationMsg] = useState('');
@@ -21,11 +41,29 @@ export default function SuperAdminDashboard() {
     let cancelled = false;
     setLoading(true);
     setError('');
-    Promise.all([listInstitutions(), listAdminInviteCodes()])
-      .then(([instList, codeList]) => {
+    Promise.all([
+      listInstitutions(),
+      listAdminInviteCodes(),
+      listUpcomingReminderNotes(),
+      listRecentAuditLogs(10),
+      reloadPackages(),
+    ])
+      .then(async ([instList, codeList, reminderList, activityList]) => {
         if (!cancelled) {
           setInstitutions(instList);
           setCodes(codeList);
+          setReminders(reminderList);
+          setRecentActivities(activityList);
+          await bootstrapSubscriptionsFromInstitutions(instList);
+          const [subscriptionRows, paymentRows] = await Promise.all([
+            listSubscriptions(),
+            listSubscriptionPayments(),
+          ]);
+          if (!cancelled) {
+            setSubscriptionStats(
+              computeSubscriptionDashboardStats(subscriptionRows, paymentRows),
+            );
+          }
         }
       })
       .catch((e) => {
@@ -41,7 +79,7 @@ export default function SuperAdminDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadPackages]);
 
   const stats = useMemo(() => {
     const activeCount = institutions.filter((i) => i.isActive).length;
@@ -68,19 +106,29 @@ export default function SuperAdminDashboard() {
           <StatCard title="Toplam kurum" value={stats.total} hint="Tüm kayıtlar" icon={Building2} />
           <StatCard title="Aktif kurum" value={stats.active} hint="isActive: true" icon={CheckCircle} />
           <StatCard
+            title="Aktif abonelik"
+            value={subscriptionStats.activeCount}
+            hint="Abonelik durumu aktif"
+            icon={CreditCard}
+          />
+          <StatCard
+            title="Geciken ödeme"
+            value={subscriptionStats.overdueCount}
+            hint="Vadesi geçmiş abonelikler"
+            icon={XCircle}
+          />
+          <StatCard
             title="Kullanılmamış admin kodu"
             value={stats.unusedCodes}
             hint="Bekleyen davetler"
             icon={KeyRound}
           />
-          <StatCard
-            title="Kullanılmış admin kodu"
-            value={stats.usedCodes}
-            hint="Tamamlanan kayıtlar"
-            icon={XCircle}
-          />
         </div>
       )}
+
+      <UpcomingRemindersWidget reminders={reminders} loading={loading} />
+
+      <RecentActivitiesWidget activities={recentActivities} loading={loading} />
 
       <section className="page-card" style={{ marginTop: '1rem' }}>
         <h3 className="page-heading" style={{ fontSize: '1.1rem' }}>
@@ -135,6 +183,10 @@ export default function SuperAdminDashboard() {
       </section>
 
       <div className="quick-links">
+        <Link to="/superadmin/subscriptions" className="page-card quick-link">
+          <strong>Abonelikler</strong>
+          <span>Kurum aboneliklerini ve tahsilatları yönet</span>
+        </Link>
         <Link to="/superadmin/institutions" className="page-card quick-link">
           <strong>Kurumlar</strong>
           <span>Kurum listesini görüntüle</span>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import { auth } from '../../firebase/firebaseConfig';
 import {
   currentMonthKey,
@@ -19,6 +20,7 @@ import {
 
 export default function StudentPaymentsPage() {
   const { currentUserProfile } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
   const monthKey = useMemo(() => currentMonthKey(), []);
 
@@ -108,6 +110,9 @@ export default function StudentPaymentsPage() {
       setError('Geçerli tutar girin.');
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
     setSaving(true);
     try {
       const receipt = await recordStudentPayment({
@@ -131,7 +136,8 @@ export default function StudentPaymentsPage() {
       setSelectedId('');
       await loadData();
     } catch (e) {
-      setError(e?.message ?? 'Ödeme kaydedilemedi.');
+      const msg = resolveActionError(e, 'Ödeme kaydedilemedi.');
+      if (msg) setError(msg);
     } finally {
       setSaving(false);
     }
@@ -140,6 +146,9 @@ export default function StudentPaymentsPage() {
   const onBulkNotify = async () => {
     if (!unpaidStudents.length) {
       setError('Bu ay ödeme yapmamış aktif öğrenci yok.');
+      return;
+    }
+    if (!ensureAllowed()) {
       return;
     }
     setBulkSending(true);
@@ -184,12 +193,16 @@ export default function StudentPaymentsPage() {
   };
 
   const onNotifyOne = async (student) => {
+    if (!ensureAllowed()) {
+      return;
+    }
     setNotifyingId(student.id);
     try {
       await createPaymentReminderNotification(student.id, institutionId);
       setSuccess(`${student.name} için bildirim oluşturuldu.`);
     } catch (e) {
-      setError(e?.message ?? 'Bildirim gönderilemedi.');
+      const msg = resolveActionError(e, 'Bildirim gönderilemedi.');
+      if (msg) setError(msg);
     } finally {
       setNotifyingId('');
     }

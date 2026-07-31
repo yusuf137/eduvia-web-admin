@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { normalizeModules } from '../../constants/institutionModules';
-import {
-  applyPresetModules,
-  getPackagePreset,
-  isCustomModuleOverride,
-  resolveInstitutionPlan,
-} from '../../config/packagePresets';
+import { usePackages } from '../../contexts/PackageCatalogContext';
 import { updateInstitutionPlanAndModules } from '../../services/institutionService';
+import {
+  getSelectablePackagesForInstitutionCreate,
+  isCustomModuleOverrideForPackage,
+  resolvePackageForInstitution,
+} from '../../utils/packageResolver';
 import InstitutionModulesEditor from '../InstitutionModulesEditor';
 import PackageSelector from '../PackageSelector';
 
@@ -17,6 +17,7 @@ import PackageSelector from '../PackageSelector';
  *     name: string,
  *     plan?: string | null,
  *     planName?: string | null,
+ *     packageId?: string | null,
  *     modules?: Record<string, boolean>,
  *   } | null,
  *   open: boolean,
@@ -25,61 +26,84 @@ import PackageSelector from '../PackageSelector';
  * }} props
  */
 export default function InstitutionEditModulesModal({ institution, open, onClose, onSaved }) {
-  const [plan, setPlan] = useState('standard');
+  const { packages, loading: packagesLoading } = usePackages();
+  const [selectedPackageId, setSelectedPackageId] = useState('');
   const [modules, setModules] = useState(normalizeModules(null));
   const [modulesCustomized, setModulesCustomized] = useState(false);
-  const [pendingPlan, setPendingPlan] = useState(null);
+  const [pendingPackageId, setPendingPackageId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const selectablePackages = useMemo(() => {
+    const active = getSelectablePackagesForInstitutionCreate(packages);
+    const current = institution ? resolvePackageForInstitution(institution, packages) : null;
+    if (current && !active.some((pkg) => pkg.id === current.id)) {
+      return [current, ...active];
+    }
+    return active.length ? active : packages.filter((row) => !row.archived);
+  }, [institution, packages]);
+
+  const selectedPackage = useMemo(
+    () => selectablePackages.find((pkg) => pkg.id === selectedPackageId) ?? null,
+    [selectablePackages, selectedPackageId],
+  );
+
   useEffect(() => {
     if (open && institution) {
-      const resolved = resolveInstitutionPlan(institution);
-      setPlan(resolved.plan);
-      setModules(normalizeModules(institution.modules ?? resolved.preset.modules));
-      setModulesCustomized(isCustomModuleOverride(resolved.plan, institution.modules));
-      setPendingPlan(null);
+      const resolved = resolvePackageForInstitution(institution, packages);
+      setSelectedPackageId(resolved.id);
+      setModules(normalizeModules(institution.modules ?? resolved.modules));
+      setModulesCustomized(isCustomModuleOverrideForPackage(resolved, institution.modules));
+      setPendingPackageId(null);
       setError('');
     }
-  }, [open, institution]);
+  }, [open, institution, packages]);
 
-  const planPreset = useMemo(() => getPackagePreset(plan), [plan]);
   const hasModuleOverride = useMemo(
-    () => modulesCustomized || isCustomModuleOverride(plan, modules),
-    [modulesCustomized, plan, modules],
+    () =>
+      modulesCustomized
+      || (selectedPackage ? isCustomModuleOverrideForPackage(selectedPackage, modules) : false),
+    [modulesCustomized, selectedPackage, modules],
   );
 
   if (!open || !institution) {
     return null;
   }
 
-  const applyPlan = (planKey) => {
-    const preset = getPackagePreset(planKey);
-    setPlan(planKey);
-    setModules({ ...preset.modules });
+  const applyPackage = (pkg) => {
+    setSelectedPackageId(pkg.id);
+    setModules({ ...pkg.modules });
     setModulesCustomized(false);
-    setPendingPlan(null);
+    setPendingPackageId(null);
   };
 
-  const onPlanSelect = (planKey) => {
-    if (planKey === plan) {
+  const onPackageSelect = (pkg) => {
+    if (pkg.id === selectedPackageId) {
       return;
     }
-    setPendingPlan(planKey);
+    setPendingPackageId(pkg.id);
   };
 
   const onModulesChange = (next) => {
     setModules(next);
-    setModulesCustomized(isCustomModuleOverride(plan, next));
+    setModulesCustomized(
+      selectedPackage ? isCustomModuleOverrideForPackage(selectedPackage, next) : true,
+    );
   };
 
   const onSave = async () => {
+    if (!selectedPackage) {
+      setError('Lütfen bir paket seçin.');
+      return;
+    }
+
     setSaving(true);
     setError('');
     try {
       await updateInstitutionPlanAndModules(institution.id, {
-        plan,
-        planName: planPreset.name,
+        packageId: selectedPackage.id,
+        plan: selectedPackage.slug,
+        planName: selectedPackage.name,
         modules,
       });
       onSaved();
@@ -90,6 +114,10 @@ export default function InstitutionEditModulesModal({ institution, open, onClose
       setSaving(false);
     }
   };
+
+  const pendingPackage = pendingPackageId
+    ? selectablePackages.find((pkg) => pkg.id === pendingPackageId) ?? null
+    : null;
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -105,7 +133,16 @@ export default function InstitutionEditModulesModal({ institution, open, onClose
 
         {error ? <div className="alert alert--error">{error}</div> : null}
 
-        <PackageSelector selectedPlan={plan} onSelect={onPlanSelect} disabled={saving} />
+        {packagesLoading ? (
+          <p className="muted">Paketler yükleniyor…</p>
+        ) : (
+          <PackageSelector
+            packages={selectablePackages}
+            selectedPackageId={selectedPackageId}
+            onSelect={onPackageSelect}
+            disabled={saving}
+          />
+        )}
 
         <div className="alert alert--info package-info-banner">
           Seçilen pakete göre modüller otomatik ayarlanır. İsterseniz aşağıdan ek özellikleri manuel
@@ -125,25 +162,25 @@ export default function InstitutionEditModulesModal({ institution, open, onClose
           legend="Ek Özellikler / Modül Ayarları"
         />
 
-        {pendingPlan ? (
+        {pendingPackage ? (
           <div className="plan-change-confirm" role="alertdialog" aria-labelledby="plan-change-title">
             <h4 id="plan-change-title">Paket değişikliği</h4>
             <p>
-              Paket değiştirildiğinde modül ayarları seçilen pakete göre yeniden düzenlenecek. Devam
-              etmek istiyor musunuz?
+              Paket <strong>{pendingPackage.name}</strong> olarak değiştirilecek ve modül ayarları
+              buna göre yeniden düzenlenecek. Devam etmek istiyor musunuz?
             </p>
             <div className="modal-card__actions">
               <button
                 type="button"
                 className="btn btn--ghost"
-                onClick={() => setPendingPlan(null)}
+                onClick={() => setPendingPackageId(null)}
                 disabled={saving}>
                 Vazgeç
               </button>
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={() => applyPlan(pendingPlan)}
+                onClick={() => applyPackage(pendingPackage)}
                 disabled={saving}>
                 Paketi Uygula
               </button>

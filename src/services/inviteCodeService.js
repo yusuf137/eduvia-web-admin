@@ -1,4 +1,6 @@
 import { auth, db } from '../firebase/firebaseConfig';
+import { AUDIT_ACTIONS, AUDIT_MODULES } from '../constants/auditActions';
+import { auditLogger } from './auditLogger';
 import {
   collection,
   doc,
@@ -144,6 +146,16 @@ export async function createAdminInviteCode(institutionId, institutionName) {
       await setDoc(ref, inviteCodeData);
       // eslint-disable-next-line no-console
       console.log('CREATE ADMIN INVITE CODE SUCCESS:', code);
+
+      auditLogger.log({
+        action: AUDIT_ACTIONS.INVITATION_CODE_CREATED,
+        module: AUDIT_MODULES.INVITE,
+        institutionId: inst,
+        institutionName: instName || '—',
+        description: `${instName || 'Kurum'} için admin davet kodu oluşturuldu (${code}).`,
+        newData: { code, institutionId: inst, institutionName: instName },
+      });
+
       return code;
     } catch (error) {
       // eslint-disable-next-line no-console

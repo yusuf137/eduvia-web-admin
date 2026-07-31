@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import { auth } from '../../firebase/firebaseConfig';
 import {
   fetchAllBranches,
@@ -24,6 +25,7 @@ const emptyForm = () => ({
 
 export default function BranchManagementPage() {
   const { currentUserProfile } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
   const adminUid = auth.currentUser?.uid ?? '';
   const adminName = currentUserProfile?.name ?? '';
@@ -116,6 +118,9 @@ export default function BranchManagementPage() {
       setError('En az bir seviye ekleyin.');
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
     setSaving(true);
     setError('');
     setSuccess('');
@@ -140,7 +145,8 @@ export default function BranchManagementPage() {
       closeModal();
       await loadBranches();
     } catch (err) {
-      setError(err?.message ?? 'Kayıt başarısız.');
+      const msg = resolveActionError(err, 'Kayıt başarısız.');
+      if (msg) setError(msg);
     } finally {
       setSaving(false);
     }
@@ -148,6 +154,9 @@ export default function BranchManagementPage() {
 
   const onDeactivate = async (branch) => {
     if (!window.confirm(`"${branch.name}" pasif edilsin mi?`)) return;
+    if (!ensureAllowed()) {
+      return;
+    }
     setError('');
     setSuccess('');
     try {
@@ -155,7 +164,8 @@ export default function BranchManagementPage() {
       setSuccess('Branş pasif edildi.');
       await loadBranches();
     } catch (err) {
-      setError(err?.message ?? 'Pasif edilemedi.');
+      const msg = resolveActionError(err, 'Pasif edilemedi.');
+      if (msg) setError(msg);
     }
   };
 

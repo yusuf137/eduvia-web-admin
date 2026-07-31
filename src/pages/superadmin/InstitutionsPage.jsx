@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import InstitutionEditModulesModal from '../../components/superadmin/InstitutionEditModulesModal';
 import { formatModulesSummary } from '../../constants/institutionModules';
+import { usePackages } from '../../contexts/PackageCatalogContext';
 import {
   getPlanDisplayLabel,
-  isCustomModuleOverride,
-  resolveInstitutionPlan,
-} from '../../config/packagePresets';
+  isCustomModuleOverrideForPackage,
+  resolvePackageForInstitution,
+} from '../../utils/packageResolver';
 import { listInstitutions } from '../../services/institutionService';
 import { getInstitutionPanelHost, getInstitutionPanelUrl } from '../../utils/subdomain';
 
@@ -47,6 +48,7 @@ function SubdomainRow({ slug }) {
 }
 
 export default function InstitutionsPage() {
+  const { packages, loading: packagesLoading } = usePackages();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -76,7 +78,7 @@ export default function InstitutionsPage() {
 
       {error ? <div className="alert alert--error">{error}</div> : null}
 
-      {loading ? (
+      {loading || packagesLoading ? (
         <div className="page-card">
           <p className="muted">Kurumlar yükleniyor…</p>
         </div>
@@ -90,9 +92,9 @@ export default function InstitutionsPage() {
       ) : (
         <div className="data-grid">
           {rows.map((item) => {
-            const { plan } = resolveInstitutionPlan(item);
-            const planLabel = getPlanDisplayLabel(item);
-            const customized = isCustomModuleOverride(plan, item.modules);
+            const resolvedPackage = resolvePackageForInstitution(item, packages);
+            const planLabel = getPlanDisplayLabel(item, packages);
+            const customized = isCustomModuleOverrideForPackage(resolvedPackage, item.modules);
             return (
             <article key={item.id} className="data-card">
               <div className="data-card__head">
@@ -139,6 +141,11 @@ export default function InstitutionsPage() {
                 </div>
               </dl>
               <div className="data-card__actions">
+                <Link
+                  to={`/superadmin/institutions/${item.id}`}
+                  className="btn btn--ghost">
+                  Detay / Notlar
+                </Link>
                 <button
                   type="button"
                   className="btn btn--ghost"

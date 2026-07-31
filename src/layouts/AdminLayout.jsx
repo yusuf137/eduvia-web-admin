@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { SubscriptionActionGuardProvider } from '../contexts/SubscriptionActionGuardContext';
 import { filterAdminMenu } from '../config/adminMenu';
 import { normalizeModules } from '../constants/institutionModules';
 import Sidebar from '../components/Sidebar';
@@ -22,10 +23,10 @@ const TITLES = {
 
 export default function AdminLayout() {
   const { pathname } = useLocation();
-  const { institutionModules, modulesLoading } = useAuth();
+  const { institutionModules, institutionAccess, subscriptionBanner, modulesLoading } = useAuth();
   const pageTitle = TITLES[pathname] ?? 'Kurum Yönetimi';
   const modules = normalizeModules(institutionModules);
-  const menuItems = filterAdminMenu(institutionModules);
+  const menuItems = filterAdminMenu(institutionModules, institutionAccess);
 
   // eslint-disable-next-line no-console
   console.log('WEB CURRENT MODULES:', modules);
@@ -50,14 +51,24 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="app-shell">
-      <Sidebar subtitle="Kurum Admin" items={menuItems} />
-      <div className="app-shell__main">
-        <Topbar pageTitle={pageTitle} />
-        <main className="app-shell__content">
-          <Outlet />
-        </main>
+    <SubscriptionActionGuardProvider>
+      <div className="app-shell">
+        <Sidebar subtitle="Kurum Admin" items={menuItems} />
+        <div className="app-shell__main">
+          <Topbar pageTitle={pageTitle} />
+          <main className="app-shell__content">
+            {subscriptionBanner ? (
+              <div className="alert alert--warn subscription-inactive-banner">
+                {subscriptionBanner}
+                {institutionAccess.isWriteBlocked
+                  ? ' Paket gerektiren işlemler (yeni kayıt, ders, video, bildirim vb.) devre dışıdır.'
+                  : ''}
+              </div>
+            ) : null}
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </SubscriptionActionGuardProvider>
   );
 }

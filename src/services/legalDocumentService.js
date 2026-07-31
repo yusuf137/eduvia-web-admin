@@ -1,6 +1,8 @@
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebaseConfig';
 import { sanitizeLegalPlainContent, validateLegalDocumentPayload } from '../utils/legalContentSanitize';
+import { AUDIT_ACTIONS, AUDIT_MODULES } from '../constants/auditActions';
+import { auditLogger } from './auditLogger';
 
 function mapLegalDoc(snap) {
   const data = snap.data() ?? {};
@@ -45,6 +47,8 @@ export async function saveLegalDocument(documentId, { title, content }, updatedB
 
   const { title: titleTrim, content: contentTrim } = validateLegalDocumentPayload({ title, content });
 
+  const previous = await fetchLegalDocument(id);
+
   await setDoc(
     doc(db, 'legalDocuments', id),
     {
@@ -58,5 +62,16 @@ export async function saveLegalDocument(documentId, { title, content }, updatedB
   );
 
   const saved = await fetchLegalDocument(id);
+
+  auditLogger.log({
+    action: AUDIT_ACTIONS.LEGAL_DOCUMENT_UPDATED,
+    module: AUDIT_MODULES.LEGAL,
+    description: `Yasal metin güncellendi: ${titleTrim}.`,
+    oldData: previous
+      ? { title: previous.title, contentLength: previous.content?.length ?? 0 }
+      : null,
+    newData: { title: titleTrim, contentLength: contentTrim.length, documentId: id },
+  });
+
   return saved;
 }

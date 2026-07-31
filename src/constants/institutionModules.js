@@ -65,7 +65,11 @@ export function buildModulesPayload(modules) {
   };
 }
 
-export function isModuleEnabled(modules, moduleKey) {
+export function isModuleEnabled(modules, moduleKey, access = {}) {
+  const status = access.subscriptionStatus ?? access.status ?? null;
+  if (status === 'cancelled') {
+    return moduleKey === 'webPanel' || !moduleKey;
+  }
   if (!moduleKey) return true;
   const normalized = normalizeModules(modules);
   const canonical = resolveModuleKey(moduleKey);

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { collection, deleteDoc, doc, getDocs, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  deleteDemoRequest,
+  updateDemoRequestStatus,
+} from '../../services/demoRequestService';
 
 const STATUS_LABELS = {
   new: 'Yeni',
@@ -78,46 +82,39 @@ export default function DemoRequestsPage() {
     void load();
   }, [load]);
 
-  const handleDeleteRequest = async (requestId) => {
+  const handleDeleteRequest = async (request) => {
     if (!isSuperAdmin) {
       return;
     }
-    setDeletingId(requestId);
+    setDeletingId(request.id);
     setError('');
     try {
-      // eslint-disable-next-line no-console
-      console.log('DELETE DEMO REQUEST:', requestId);
-      await deleteDoc(doc(db, 'demoRequests', requestId));
-      setRequests((prev) => prev.filter((item) => item.id !== requestId));
+      await deleteDemoRequest(request.id, request);
+      setRequests((prev) => prev.filter((item) => item.id !== request.id));
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.log('DELETE DEMO REQUEST ERROR:', err?.code, err?.message);
-      setError('Demo talebi silinemedi.');
+      setError(err?.message ?? 'Demo talebi silinemedi.');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const confirmDeleteRequest = (requestId) => {
+  const confirmDeleteRequest = (request) => {
     if (!isSuperAdmin) {
       return;
     }
     const ok = window.confirm('Bu demo talebini silmek istediğine emin misin?');
     if (ok) {
-      void handleDeleteRequest(requestId);
+      void handleDeleteRequest(request);
     }
   };
 
-  const handleStatusChange = async (requestId, newStatus) => {
-    setUpdatingId(requestId);
+  const handleStatusChange = async (request, newStatus) => {
+    setUpdatingId(request.id);
     setError('');
     try {
-      await updateDoc(doc(db, 'demoRequests', requestId), {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-      });
+      await updateDemoRequestStatus(request.id, newStatus, request);
       setRequests((prev) =>
-        prev.map((row) => (row.id === requestId ? { ...row, status: newStatus } : row)),
+        prev.map((row) => (row.id === request.id ? { ...row, status: newStatus } : row)),
       );
     } catch (e) {
       setError(e?.message ?? 'Durum güncellenemedi.');
@@ -187,7 +184,7 @@ export default function DemoRequestsPage() {
                     type="button"
                     className="btn btn--ghost"
                     disabled={updatingId === row.id || deletingId === row.id}
-                    onClick={() => void handleStatusChange(row.id, action.status)}>
+                    onClick={() => void handleStatusChange(row, action.status)}>
                     {action.label}
                   </button>
                 ))}
@@ -196,7 +193,7 @@ export default function DemoRequestsPage() {
                     type="button"
                     className="btn btn--danger"
                     disabled={updatingId === row.id || deletingId === row.id}
-                    onClick={() => confirmDeleteRequest(row.id)}>
+                    onClick={() => confirmDeleteRequest(row)}>
                     {deletingId === row.id ? 'Siliniyor…' : 'Sil'}
                   </button>
                 ) : null}

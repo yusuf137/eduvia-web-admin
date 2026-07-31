@@ -12,6 +12,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { isModuleEnabled, normalizeModules } from '../constants/institutionModules';
+import { SUBSCRIPTION_STATUS } from '../constants/subscriptionStatus';
 
 export const ADMIN_MENU = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true, moduleKey: 'webPanel' },
@@ -48,22 +49,29 @@ export const ADMIN_ROUTE_MODULES = {
   '/admin/branches': 'branches',
 };
 
-export function isAdminMenuItemVisible(item, modules) {
+function getAccessStatus(access = {}) {
+  return access.subscriptionStatus ?? SUBSCRIPTION_STATUS.ACTIVE;
+}
+
+export function isAdminMenuItemVisible(item, modules, access = {}) {
   const normalized = normalizeModules(modules);
   if (!normalized.webPanel) {
     return false;
   }
+  if (getAccessStatus(access) === SUBSCRIPTION_STATUS.CANCELLED) {
+    return item.to === '/admin';
+  }
   if (item.requireAny?.length) {
-    return item.requireAny.some((key) => isModuleEnabled(normalized, key));
+    return item.requireAny.some((key) => isModuleEnabled(normalized, key, access));
   }
   if (item.moduleKey) {
-    return isModuleEnabled(normalized, item.moduleKey);
+    return isModuleEnabled(normalized, item.moduleKey, access);
   }
   return true;
 }
 
-export function filterAdminMenu(modules) {
-  return ADMIN_MENU.filter((item) => isAdminMenuItemVisible(item, modules));
+export function filterAdminMenu(modules, access = {}) {
+  return ADMIN_MENU.filter((item) => isAdminMenuItemVisible(item, modules, access));
 }
 
 export function getAdminRouteModuleKey(pathname) {
@@ -73,19 +81,22 @@ export function getAdminRouteModuleKey(pathname) {
   return 'webPanel';
 }
 
-export function isAdminRouteAllowed(pathname, modules) {
+export function isAdminRouteAllowed(pathname, modules, access = {}) {
   const normalized = normalizeModules(modules);
   if (!normalized.webPanel) {
     return false;
   }
+  if (getAccessStatus(access) === SUBSCRIPTION_STATUS.CANCELLED && pathname !== '/admin') {
+    return false;
+  }
   if (pathname === '/admin/requests') {
     return (
-      isModuleEnabled(normalized, 'scheduleRequests')
-      || isModuleEnabled(normalized, 'attendance')
-      || isModuleEnabled(normalized, 'makeupLessons')
-      || isModuleEnabled(normalized, 'lessons')
+      isModuleEnabled(normalized, 'scheduleRequests', access)
+      || isModuleEnabled(normalized, 'attendance', access)
+      || isModuleEnabled(normalized, 'makeupLessons', access)
+      || isModuleEnabled(normalized, 'lessons', access)
     );
   }
   const key = getAdminRouteModuleKey(pathname);
-  return isModuleEnabled(normalized, key);
+  return isModuleEnabled(normalized, key, access);
 }

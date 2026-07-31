@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscriptionActionGuard } from '../../contexts/SubscriptionActionGuardContext';
 import { auth } from '../../firebase/firebaseConfig';
 import {
   fetchVideoLibrary,
@@ -31,6 +32,7 @@ const emptyForm = () => ({
 
 export default function VideoLibraryPage() {
   const { currentUserProfile } = useAuth();
+  const { ensureAllowed, resolveActionError } = useSubscriptionActionGuard();
   const institutionId = currentUserProfile?.institutionId ?? '';
   const adminUid = auth.currentUser?.uid ?? '';
   const adminName = currentUserProfile?.name ?? '';
@@ -113,6 +115,9 @@ export default function VideoLibraryPage() {
       setError('Kurum bilgisi bulunamadı.');
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
     setSaving(true);
     setError('');
     setSuccess('');
@@ -151,7 +156,8 @@ export default function VideoLibraryPage() {
       closeModal();
       await loadVideos();
     } catch (err) {
-      setError(err?.message ?? 'Kayıt başarısız.');
+      const msg = resolveActionError(err, 'Kayıt başarısız.');
+      if (msg) setError(msg);
     } finally {
       setSaving(false);
     }
@@ -161,6 +167,9 @@ export default function VideoLibraryPage() {
     if (!window.confirm(`"${video.title}" pasif edilsin mi?`)) {
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
     setError('');
     setSuccess('');
     try {
@@ -168,7 +177,8 @@ export default function VideoLibraryPage() {
       setSuccess('Video pasif edildi.');
       await loadVideos();
     } catch (err) {
-      setError(err?.message ?? 'Pasif edilemedi.');
+      const msg = resolveActionError(err, 'Pasif edilemedi.');
+      if (msg) setError(msg);
     }
   };
 
@@ -180,6 +190,9 @@ export default function VideoLibraryPage() {
     ) {
       return;
     }
+    if (!ensureAllowed()) {
+      return;
+    }
     setError('');
     setSuccess('');
     try {
@@ -187,7 +200,8 @@ export default function VideoLibraryPage() {
       setSuccess('Video silindi.');
       await loadVideos();
     } catch (err) {
-      setError(err?.message ?? 'Video silinemedi.');
+      const msg = resolveActionError(err, 'Video silinemedi.');
+      if (msg) setError(msg);
     }
   };
 

@@ -5,6 +5,9 @@ import {
   normalizeModules,
 } from '../constants/institutionModules';
 import {
+  normalizeSubscription,
+} from '../models/subscriptionModel';
+import {
   addDoc,
   collection,
   doc,
@@ -17,6 +20,8 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { AUDIT_ACTIONS, AUDIT_MODULES } from '../constants/auditActions';
+import { auditLogger } from './auditLogger';
 
 export { DEFAULT_MODULES, normalizeModules, buildModulesPayload };
 
@@ -65,8 +70,16 @@ function mapInstitutionDoc(d) {
     city: String(data.city ?? ''),
     address: String(data.address ?? ''),
     isActive: data.isActive !== false,
+    subscription: data.subscription
+      ? normalizeSubscription(data.subscription, { ...data, id: d.id })
+      : null,
+    subscriptionStatus: String(
+      data.subscription?.status ?? data.subscriptionStatus ?? 'trial',
+    ),
+    trialEndDate: data.subscription?.endDate ?? data.trialEndDate ?? null,
     plan: plan || null,
     planName: planName || null,
+    packageId: String(data.packageId ?? '').trim() || null,
     modules,
     createdAt,
     createdBy: data.createdBy ?? null,
@@ -222,7 +235,7 @@ export async function isSlugTaken(slug) {
 }
 
 export async function createInstitution(
-  { name, slug, phone, email, city, address, isActive = true, plan, planName, modules },
+  { name, slug, phone, email, city, address, isActive = true, plan, planName, packageId, modules },
   { currentUserProfile } = {},
 ) {
   const uid = auth.currentUser?.uid;
@@ -272,6 +285,7 @@ export async function createInstitution(
 
   const cleanPlan = String(plan ?? 'standard').trim() || 'standard';
   const cleanPlanName = String(planName ?? '').trim() || cleanPlan;
+  const cleanPackageId = String(packageId ?? cleanPlan).trim() || cleanPlan;
 
   const institutionData = {
     name: cleanName,
@@ -281,6 +295,7 @@ export async function createInstitution(
     city: String(city ?? '').trim(),
     address: String(address ?? '').trim(),
     isActive: isActive !== false,
+    packageId: cleanPackageId,
     plan: cleanPlan,
     planName: cleanPlanName,
     modules: modulesPayload,
@@ -331,6 +346,22 @@ export async function createInstitution(
     };
   }
 
+  auditLogger.log({
+    action: AUDIT_ACTIONS.INSTITUTION_CREATED,
+    module: AUDIT_MODULES.INSTITUTION,
+    institutionId: institutionRef.id,
+    institutionName: cleanName,
+    description: `${cleanName} kurumu oluşturuldu.`,
+    newData: {
+      name: cleanName,
+      slug: cleanSlug,
+      plan: cleanPlan,
+      planName: cleanPlanName,
+      email: institutionData.email,
+      phone: institutionData.phone,
+    },
+  });
+
   return { id: institutionRef.id, slug: cleanSlug };
 }
 
@@ -340,7 +371,7 @@ export async function updateInstitutionModules(institutionId, modules) {
 
 export async function updateInstitutionPlanAndModules(
   institutionId,
-  { plan, planName, modules },
+  { plan, planName, packageId, modules },
 ) {
   const id = String(institutionId ?? '').trim();
   if (!id) {
@@ -360,16 +391,92 @@ export async function updateInstitutionPlanAndModules(
   if (planName != null) {
     updateData.planName = String(planName).trim();
   }
+  if (packageId != null) {
+    updateData.packageId = String(packageId).trim();
+  }
+
+  const previousSnap = await getDoc(doc(db, 'institutions', id));
+  const previous = previousSnap.exists() ? mapInstitutionDoc(previousSnap) : null;
 
   // eslint-disable-next-line no-console
   console.log('WEB INSTITUTION UPDATE PLAN/MODULES:', updateData);
 
   try {
     await updateDoc(doc(db, 'institutions', id), updateData);
+
+    auditLogger.log({
+      action: AUDIT_ACTIONS.INSTITUTION_UPDATED,
+      module: AUDIT_MODULES.INSTITUTION,
+      institutionId: id,
+      institutionName: previous?.name ?? '',
+      description: `${previous?.name ?? 'Kurum'} bilgileri güncellendi.`,
+      oldData: {
+        plan: previous?.plan ?? null,
+        planName: previous?.planName ?? null,
+        modules: previous?.modules ?? null,
+      },
+      newData: {
+        plan: updateData.plan ?? previous?.plan ?? null,
+        planName: updateData.planName ?? previous?.planName ?? null,
+        modules: updateData.modules ?? previous?.modules ?? null,
+      },
+    });
+
     return { id, ...updateData };
   } catch (error) {
     // eslint-disable-next-line no-console
     console.log('WEB INSTITUTION PLAN/MODULE UPDATE ERROR:', error.code, error.message);
     throw error;
   }
+}
+
+export async function updateInstitutionSubscription(institutionId, subscriptionPayload) {
+  const id = String(institutionId ?? '').trim();
+  if (!id) {
+    throw new Error('Kurum kimliği gerekli.');
+  }
+
+  const updateData = {
+    subscription: subscriptionPayload,
+    subscriptionStatus: String(subscriptionPayload.status ?? 'trial'),
+    updatedAt: serverTimestamp(),
+  };
+
+  try {
+    await updateDoc(doc(db, 'institutions', id), updateData);
+    return fetchInstitutionById(id);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log('INSTITUTION SUBSCRIPTION UPDATE ERROR:', error.code, error.message);
+    throw error;
+  }
+}
+
+/** @deprecated */
+export async function updateInstitutionSubscriptionStatus(institutionId, subscriptionStatus) {
+  const inst = await fetchInstitutionById(institutionId);
+  if (!inst?.subscription) {
+    return updateInstitutionSubscription(institutionId, {
+      status: String(subscriptionStatus),
+      autoRenew: false,
+    });
+  }
+  return updateInstitutionSubscription(institutionId, {
+    ...inst.subscription,
+    status: String(subscriptionStatus),
+  });
+}
+
+/** @deprecated */
+export async function updateInstitutionAccessStatus(
+  institutionId,
+  { packageStatus, subscriptionStatus },
+) {
+  if (subscriptionStatus != null) {
+    return updateInstitutionSubscriptionStatus(institutionId, subscriptionStatus);
+  }
+  if (packageStatus === 'inactive') {
+    return updateInstitutionSubscriptionStatus(institutionId, 'suspended');
+  }
+  return fetchInstitutionById(institutionId);
 }

@@ -7,6 +7,9 @@ import LoginPage from './pages/LoginPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import InstitutionsPage from './pages/superadmin/InstitutionsPage';
+import InstitutionDetailPage from './pages/superadmin/InstitutionDetailPage';
+import SubscriptionsPage from './pages/superadmin/SubscriptionsPage';
+import PaymentHistoryPage from './pages/superadmin/PaymentHistoryPage';
 import InstitutionCreatePage from './pages/superadmin/InstitutionCreatePage';
 import AdminInviteCodesPage from './pages/superadmin/AdminInviteCodesPage';
 import DemoRequestsPage from './pages/superadmin/DemoRequestsPage';
@@ -27,6 +30,9 @@ import { useSubdomainInstitution } from './hooks/useSubdomainInstitution';
 import { logout } from './services/authService';
 import LegalDocumentPublicPage from './pages/public/LegalDocumentPublicPage';
 import LegalDocumentsPage from './pages/superadmin/LegalDocumentsPage';
+import AuditLogPage from './pages/superadmin/AuditLogPage';
+import PackagesPage from './pages/superadmin/PackagesPage';
+import RejectedInstitutionsPage from './pages/superadmin/RejectedInstitutionsPage';
 import {
   isLegalPublicPath,
   LEGAL_DOCUMENT_IDS,
@@ -204,11 +210,17 @@ function AppRoutes() {
         <Route element={<RequireSuperAdmin />}>
           <Route path="/superadmin" element={<SuperAdminLayout />}>
             <Route index element={<SuperAdminDashboard />} />
+            <Route path="subscriptions" element={<SubscriptionsPage />} />
+            <Route path="packages" element={<PackagesPage />} />
+            <Route path="payment-history" element={<PaymentHistoryPage />} />
             <Route path="institutions" element={<InstitutionsPage />} />
+            <Route path="rejected-institutions" element={<RejectedInstitutionsPage />} />
             <Route path="institutions/create" element={<InstitutionCreatePage />} />
+            <Route path="institutions/:institutionId" element={<InstitutionDetailPage />} />
             <Route path="invite-codes" element={<AdminInviteCodesPage />} />
             <Route path="demo-requests" element={<DemoRequestsPage />} />
             <Route path="legal-documents" element={<LegalDocumentsPage />} />
+            <Route path="audit-log" element={<AuditLogPage />} />
           </Route>
         </Route>
 
