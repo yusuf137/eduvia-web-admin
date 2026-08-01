@@ -9,13 +9,15 @@ import {
   fetchScheduleRequests,
   fetchAttendanceRequests,
   fetchMakeupRequests,
-  fetchLessonCancellations,
+  subscribeLessonCancellations,
   approveScheduleRequest,
   rejectScheduleRequest,
   approveAttendanceRequest,
   rejectAttendanceRequest,
   approveMakeupLessonRequest,
   rejectMakeupLessonRequest,
+  approveLessonCancellation,
+  rejectLessonCancellation,
   formatRequestedDateTr,
 } from '../../services/requestService';
 
@@ -23,7 +25,7 @@ const TABS = [
   { key: 'schedule', label: 'Ders Saat Değişimi' },
   { key: 'attendance', label: 'Geçmiş Yoklama' },
   { key: 'makeup', label: 'Telafi Talepleri' },
-  { key: 'cancellations', label: 'Ders İptalleri' },
+  { key: 'cancellations', label: 'Ders İptal Talepleri' },
 ];
 
 const TAB_MODULE = {
@@ -62,19 +64,30 @@ function statusLabel(status) {
   if (status === 'pending') return 'Bekliyor';
   if (status === 'approved') return 'Onaylandı';
   if (status === 'rejected') return 'Reddedildi';
-  if (status === 'cancelled') return 'İptal';
+  if (status === 'cancelled' || status === 'approved') return 'Onaylandı';
   return String(status || '—');
 }
 
 function statusBadgeClass(status) {
   if (status === 'pending') return 'badge badge--warn';
-  if (status === 'approved') return 'badge badge--ok';
+  if (status === 'approved' || status === 'cancelled') return 'badge badge--ok';
   if (status === 'rejected') return 'badge badge--danger';
   return 'badge badge--muted';
 }
 
 function filterByStatus(rows, statusFilter) {
   if (statusFilter === 'all') return rows;
+  return rows.filter((r) => String(r.status ?? '') === statusFilter);
+}
+
+function filterCancellationsByStatus(rows, statusFilter) {
+  if (statusFilter === 'all') return rows;
+  if (statusFilter === 'approved') {
+    return rows.filter((r) => {
+      const s = String(r.status ?? '');
+      return s === 'approved' || s === 'cancelled';
+    });
+  }
   return rows.filter((r) => String(r.status ?? '') === statusFilter);
 }
 
@@ -120,16 +133,20 @@ export default function RequestsPage() {
     setLoading(true);
     setError('');
     try {
-      const [sched, att, makeup, cancels] = await Promise.all([
+      const [sched, att, makeup] = await Promise.all([
         fetchScheduleRequests(institutionId),
         fetchAttendanceRequests(institutionId),
         fetchMakeupRequests(institutionId),
-        fetchLessonCancellations(institutionId),
       ]);
       setScheduleRows(sched);
       setAttendanceRows(att);
       setMakeupRows(makeup);
-      setCancellationRows(cancels);
+      // eslint-disable-next-line no-console
+      console.log('[WEB] loadAll request counts:', {
+        schedule: sched.length,
+        attendance: att.length,
+        makeup: makeup.length,
+      });
     } catch (e) {
       setError(e?.message ?? 'Talepler yüklenemedi.');
     } finally {
@@ -138,12 +155,42 @@ export default function RequestsPage() {
   }, [institutionId, currentUserProfile]);
 
   useEffect(() => {
+    if (!institutionId) {
+      setCancellationRows([]);
+      return undefined;
+    }
+
+    const unsub = subscribeLessonCancellations(
+      institutionId,
+      (rows) => {
+        setCancellationRows(rows);
+        // eslint-disable-next-line no-console
+        console.log('[WEB] cancellationRows updated:', rows.length);
+      },
+      (error) => {
+        setError(error?.message ?? 'Ders iptal talepleri dinlenemedi.');
+      },
+    );
+
+    return () => unsub();
+  }, [institutionId]);
+
+  useEffect(() => {
     void loadAll();
   }, [loadAll]);
 
   const visibleTabs = useMemo(() => {
     const mods = normalizeModules(institutionModules);
+    const requestsPageOpen =
+      isModuleEnabled(mods, 'scheduleRequests')
+      || isModuleEnabled(mods, 'attendance')
+      || isModuleEnabled(mods, 'makeupLessons')
+      || isModuleEnabled(mods, 'lessons');
+
     return TABS.filter((t) => {
+      if (t.key === 'cancellations') {
+        return requestsPageOpen;
+      }
       const mod = TAB_MODULE[t.key];
       return !mod || isModuleEnabled(mods, mod);
     });
@@ -170,8 +217,11 @@ export default function RequestsPage() {
     attendanceRows.forEach((r) => {
       if (r.lessonId) ids.add(r.lessonId);
     });
+    cancellationRows.forEach((r) => {
+      if (r.lessonId) ids.add(r.lessonId);
+    });
     return [...ids].filter((id) => lessonMap[id] === undefined);
-  }, [scheduleRows, attendanceRows, lessonMap]);
+  }, [scheduleRows, attendanceRows, cancellationRows, lessonMap]);
 
   useEffect(() => {
     if (!lessonIdsToLoad.length) return undefined;
@@ -234,11 +284,10 @@ export default function RequestsPage() {
     () => filterByStatus(makeupRows, statusFilter),
     [makeupRows, statusFilter],
   );
-  const visibleCancellations = useMemo(() => {
-    if (statusFilter === 'all') return cancellationRows;
-    if (statusFilter === 'pending') return [];
-    return cancellationRows.filter((r) => String(r.status) === statusFilter);
-  }, [cancellationRows, statusFilter]);
+  const visibleCancellations = useMemo(
+    () => filterCancellationsByStatus(cancellationRows, statusFilter),
+    [cancellationRows, statusFilter],
+  );
 
   const lessonInfo = (lessonId) => {
     const lesson = lessonMap[lessonId];
@@ -405,11 +454,16 @@ export default function RequestsPage() {
     return visibleMakeup.map((row) => {
       const pending = row.status === 'pending';
       const acting = actingKey === `makeup:${row.id}`;
-      const creditNote = row.creditReserved
-        ? row.creditReturned
-          ? 'Hak iade edildi'
-          : 'Hak düşürüldü (bekliyor)'
-        : 'Hak düşürülmedi';
+      const creditNote =
+        row.status === 'approved'
+          ? 'Telafi hakkı kullanıldı (onayda)'
+          : row.status === 'rejected'
+            ? row.creditReturned
+              ? 'Reddedildi · hak iade edildi'
+              : 'Reddedildi'
+            : row.creditReserved
+              ? 'Bekliyor · hak rezerve edildi'
+              : 'Onay bekliyor';
       return (
         <RequestCard
           key={row.id}
@@ -476,43 +530,75 @@ export default function RequestsPage() {
 
   const renderCancellations = () => {
     if (!visibleCancellations.length) {
-      return <p className="muted requests-empty">İptal kaydı bulunamadı.</p>;
+      return <p className="muted requests-empty">Kayıt bulunamadı.</p>;
     }
-    return visibleCancellations.map((row) => (
-      <RequestCard
-        key={row.id}
-        title={row.studentName}
-        status={row.status || 'cancelled'}
-        meta={
-          <>
-            <div>
-              <dt>Öğretmen</dt>
-              <dd>{row.teacherName}</dd>
-            </div>
-            <div>
-              <dt>Ders tarihi</dt>
-              <dd>{formatRequestedDateTr(row.lessonDate)}</dd>
-            </div>
-            <div>
-              <dt>Saat</dt>
-              <dd>{formatHours(row.lessonHours)}</dd>
-            </div>
-            <div>
-              <dt>Branş</dt>
-              <dd>{row.branch || '—'}</dd>
-            </div>
-            <div>
-              <dt>Sebep</dt>
-              <dd>{row.reason || '—'}</dd>
-            </div>
-            <div>
-              <dt>Oluşturulma</dt>
-              <dd>{row.createdAtLabel}</dd>
-            </div>
-          </>
-        }
-      />
-    ));
+    return visibleCancellations.map((row) => {
+      const pending = row.status === 'pending';
+      const acting = actingKey === `cancellation:${row.id}`;
+      return (
+        <RequestCard
+          key={row.id}
+          title={row.studentName}
+          status={row.status}
+          meta={
+            <>
+              <div>
+                <dt>Ders</dt>
+                <dd>{lessonInfo(row.lessonId)}</dd>
+              </div>
+              <div>
+                <dt>Eğitmen</dt>
+                <dd>{row.teacherName}</dd>
+              </div>
+              <div>
+                <dt>Ders tarihi</dt>
+                <dd>{formatRequestedDateTr(row.lessonDate)}</dd>
+              </div>
+              <div>
+                <dt>Ders saati</dt>
+                <dd>{formatHours(row.lessonHours)}</dd>
+              </div>
+              <div>
+                <dt>İptal sebebi</dt>
+                <dd>{row.reason || '—'}</dd>
+              </div>
+              <div>
+                <dt>Talep tarihi</dt>
+                <dd>{row.createdAtLabel}</dd>
+              </div>
+            </>
+          }
+          actions={
+            pending ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={acting}
+                  onClick={() =>
+                    void runAction(`cancellation:${row.id}`, () =>
+                      approveLessonCancellation(row.id, currentUserProfile),
+                    )
+                  }>
+                  {acting ? '…' : 'Onayla'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  disabled={acting}
+                  onClick={() =>
+                    void runAction(`cancellation:${row.id}`, () =>
+                      rejectLessonCancellation(row.id, currentUserProfile),
+                    )
+                  }>
+                  Reddet
+                </button>
+              </>
+            ) : null
+          }
+        />
+      );
+    });
   };
 
   return (
@@ -536,21 +622,17 @@ export default function RequestsPage() {
         ))}
       </div>
 
-      {activeTab !== 'cancellations' ? (
-        <div className="filter-bar requests-status-filter">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              className={`filter-bar__btn filter-bar__btn--sm${statusFilter === f.key ? ' filter-bar__btn--active' : ''}`}
-              onClick={() => setStatusFilter(f.key)}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="muted requests-cancel-hint">Ders iptalleri bilgilendirme amaçlı listelenir.</p>
-      )}
+      <div className="filter-bar requests-status-filter">
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            className={`filter-bar__btn filter-bar__btn--sm${statusFilter === f.key ? ' filter-bar__btn--active' : ''}`}
+            onClick={() => setStatusFilter(f.key)}>
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       {error ? <div className="alert alert--error">{error}</div> : null}
       {success ? <div className="alert alert--success">{success}</div> : null}
@@ -559,6 +641,14 @@ export default function RequestsPage() {
         <p className="muted">Talepler yükleniyor…</p>
       ) : (
         <div className="requests-list">
+          {activeTab === 'cancellations' ? (
+            <div className="requests-section-head">
+              <h3 className="requests-section-title">Ders İptal Talepleri</h3>
+              <p className="muted">
+                Öğrencilerin gönderdiği iptal talepleri onay sonrası geçerli olur. Toplam: {visibleCancellations.length}
+              </p>
+            </div>
+          ) : null}
           {activeTab === 'schedule' ? renderSchedule() : null}
           {activeTab === 'attendance' ? renderAttendance() : null}
           {activeTab === 'makeup' ? renderMakeup() : null}

@@ -4,12 +4,17 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   runTransaction,
   serverTimestamp,
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { LESSON_CANCELLATIONS_COLLECTION, LESSON_CANCELLATION_STATUS } from '../constants/lessonCancellationCollection';
+import { AUDIT_ACTIONS, AUDIT_MODULES } from '../constants/auditActions';
+import { auditLogger } from './auditLogger';
+import { syncStudentMakeupCredit } from './makeupCreditService';
 import {
   buildHoursFromStart,
   resolveLessonDurationHours,
@@ -24,6 +29,8 @@ import {
   ATTENDANCE_REQUEST_REJECTED,
   MAKEUP_LESSON_CREATED,
   MAKEUP_LESSON_REJECTED,
+  LESSON_CANCELLATION_APPROVED,
+  LESSON_CANCELLATION_REJECTED,
 } from './notificationService';
 
 function normalizeHour(raw) {
@@ -225,10 +232,13 @@ function mapCancellationDoc(d) {
     teacherName: String(data.teacherName ?? '').trim() || '(İsimsiz)',
     lessonId: String(data.lessonId ?? ''),
     lessonDate: String(data.lessonDate ?? ''),
+    weekStartDate: String(data.weekStartDate ?? ''),
     lessonHours: Array.isArray(data.lessonHours) ? data.lessonHours.map(String) : [],
     reason: String(data.reason ?? ''),
     branch: String(data.branch ?? ''),
-    status: String(data.status ?? ''),
+    status: String(data.status ?? LESSON_CANCELLATION_STATUS.PENDING),
+    reviewedBy: data.reviewedBy ?? null,
+    reviewedAt: data.reviewedAt ?? null,
     createdAt: data.createdAt ?? null,
     createdAtLabel: label,
     createdAtMs: ms,
@@ -285,14 +295,63 @@ export async function fetchLessonCancellations(institutionId) {
   if (!inst) return [];
   try {
     const snap = await getDocs(
-      query(collection(db, 'lessonCancellations'), where('institutionId', '==', inst)),
+      query(
+        collection(db, LESSON_CANCELLATIONS_COLLECTION),
+        where('institutionId', '==', inst),
+      ),
     );
-    return sortByCreatedAt(snap.docs.map(mapCancellationDoc));
+    const rows = sortByCreatedAt(snap.docs.map(mapCancellationDoc));
+    // eslint-disable-next-line no-console
+    console.log('[WEB] fetchLessonCancellations:', {
+      institutionId: inst,
+      rawCount: snap.docs.length,
+      mappedCount: rows.length,
+    });
+    return rows;
   } catch (error) {
     // eslint-disable-next-line no-console
     console.log('WEB CANCELLATIONS LOAD ERROR:', error.code, error.message);
     throw error;
   }
+}
+
+/**
+ * Kurum admini için canlı ders iptali dinleyicisi.
+ * @param {string} institutionId
+ * @param {(rows: object[]) => void} onData
+ * @param {(error: Error) => void} [onError]
+ * @returns {() => void}
+ */
+export function subscribeLessonCancellations(institutionId, onData, onError) {
+  const inst = String(institutionId ?? '').trim();
+  if (!inst) {
+    onData([]);
+    return () => {};
+  }
+
+  const q = query(
+    collection(db, LESSON_CANCELLATIONS_COLLECTION),
+    where('institutionId', '==', inst),
+  );
+
+  return onSnapshot(
+    q,
+    (snap) => {
+      const rows = sortByCreatedAt(snap.docs.map(mapCancellationDoc));
+      // eslint-disable-next-line no-console
+      console.log('[WEB] subscribeLessonCancellations snapshot:', {
+        institutionId: inst,
+        rawCount: snap.docs.length,
+        mappedCount: rows.length,
+      });
+      onData(rows);
+    },
+    (error) => {
+      // eslint-disable-next-line no-console
+      console.log('WEB CANCELLATIONS LISTENER ERROR:', error.code, error.message);
+      onError?.(error);
+    },
+  );
 }
 
 export async function approveScheduleRequest(requestId, currentUserProfile) {
@@ -456,11 +515,12 @@ export async function rejectRequest(request, type, currentUserProfile) {
   console.log('WEB REJECT DATA KEYS:', Object.keys(rejectData));
 
   const requestRef = doc(db, collectionName, requestId);
+  let makeupCreditReturn = null;
 
   if (type === 'makeup') {
     try {
       // eslint-disable-next-line no-console
-      console.log('REJECT STEP 1: makeup request + credit transaction başlıyor');
+      console.log('REJECT STEP 1: makeup request + credit return transaction başlıyor');
       await runTransaction(db, async (transaction) => {
         const requestSnap = await transaction.get(requestRef);
         if (!requestSnap.exists()) {
@@ -484,10 +544,11 @@ export async function rejectRequest(request, type, currentUserProfile) {
           if (String(userSnap.data()?.institutionId ?? '').trim() !== inst) {
             throw new Error('Öğrenci kurum bilgisi eşleşmiyor.');
           }
+          const previousCredit = Number(userSnap.data()?.makeupCredit ?? 0);
+          const newCredit = previousCredit + 1;
           updateData.creditReturned = true;
-          transaction.update(userRef, {
-            makeupCredit: Number(userSnap.data()?.makeupCredit ?? 0) + 1,
-          });
+          transaction.update(userRef, { makeupCredit: newCredit });
+          makeupCreditReturn = { previousCredit, newCredit };
         }
         transaction.update(requestRef, updateData);
       });
@@ -496,8 +557,6 @@ export async function rejectRequest(request, type, currentUserProfile) {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.log('WEB REQUEST REJECT UPDATE ERROR:', error.code, error.message);
-      // eslint-disable-next-line no-console
-      console.log('WEB MAKEUP CREDIT RETURN ERROR:', error.code, error.message);
       throw error;
     }
   } else {
@@ -534,6 +593,31 @@ export async function rejectRequest(request, type, currentUserProfile) {
     // eslint-disable-next-line no-console
     console.log('WEB REJECT NOTIFICATION ERROR:', error.code, error.message);
     notificationFailed = true;
+  }
+
+  if (type === 'makeup') {
+    const studentName = String(request.studentName ?? '').trim() || '(İsimsiz)';
+    auditLogger.log({
+      action: AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_REJECTED,
+      module: AUDIT_MODULES.REQUEST,
+      institutionId: inst,
+      description: `${studentName} telafi talebi reddedildi.`,
+      newData: { requestId, studentId: request.studentId },
+    });
+    if (makeupCreditReturn) {
+      auditLogger.log({
+        action: AUDIT_ACTIONS.MAKEUP_CREDIT_RETURNED,
+        module: AUDIT_MODULES.REQUEST,
+        institutionId: inst,
+        description: `${studentName} için rezerve telafi hakkı geri verildi (${makeupCreditReturn.previousCredit} → ${makeupCreditReturn.newCredit}).`,
+        newData: {
+          requestId,
+          studentId: request.studentId,
+          previousCredit: makeupCreditReturn.previousCredit,
+          newCredit: makeupCreditReturn.newCredit,
+        },
+      });
+    }
   }
 
   return { rejected: true, notificationFailed };
@@ -707,6 +791,28 @@ export async function approveMakeupLessonRequest(requestId, currentUserProfile) 
     /* ignore */
   }
 
+  const studentName = String(req.studentName ?? '').trim() || '(İsimsiz)';
+  auditLogger.log({
+    action: AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_APPROVED,
+    module: AUDIT_MODULES.REQUEST,
+    institutionId: inst,
+    description: `${studentName} telafi talebi onaylandı.`,
+    newData: { requestId, studentId: req.studentId, lessonId: lessonRef.id },
+  });
+  auditLogger.log({
+    action: AUDIT_ACTIONS.MAKEUP_LESSON_CREATED_FROM_REQUEST,
+    module: AUDIT_MODULES.REQUEST,
+    institutionId: inst,
+    description: `${studentName} için telafi dersi oluşturuldu.`,
+    newData: {
+      requestId,
+      lessonId: lessonRef.id,
+      teacherId: req.teacherId,
+      day: req.requestedDay,
+      hour: req.requestedHour,
+    },
+  });
+
   return { lessonId: lessonRef.id };
 }
 
@@ -714,6 +820,130 @@ export function formatRequestedDateTr(dateKey) {
   const [y, m, d] = String(dateKey).split('-').map(Number);
   const dt = new Date(y, (m || 1) - 1, d || 1);
   return dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+export async function approveLessonCancellation(cancellationId, currentUserProfile) {
+  const adminUid = String(auth.currentUser?.uid ?? '').trim();
+  const ref = doc(db, LESSON_CANCELLATIONS_COLLECTION, String(cancellationId));
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    throw new Error('Talep bulunamadı.');
+  }
+  const row = snap.data();
+  const inst = assertAdminCanManageRequest(currentUserProfile, row.institutionId);
+  if (String(row.status ?? '') !== LESSON_CANCELLATION_STATUS.PENDING) {
+    throw new Error('Bu talep daha önce işlenmiş.');
+  }
+
+  const approveData = {
+    status: LESSON_CANCELLATION_STATUS.APPROVED,
+    reviewedBy: adminUid,
+    reviewedAt: serverTimestamp(),
+  };
+
+  await updateDoc(ref, approveData);
+
+  let creditResult = null;
+  try {
+    creditResult = await syncStudentMakeupCredit(String(row.studentId ?? ''));
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log('MAKEUP CREDIT SYNC ERROR:', error?.message ?? error);
+  }
+
+  const studentName = String(row.studentName ?? '').trim() || '(İsimsiz)';
+  const lessonDateLabel = formatRequestedDateTr(String(row.lessonDate ?? ''));
+
+  auditLogger.log({
+    action: AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_APPROVED,
+    module: AUDIT_MODULES.REQUEST,
+    institutionId: inst,
+    description: `${studentName} ders iptal talebi onaylandı (${lessonDateLabel}).`,
+    newData: { cancellationId: String(cancellationId), studentId: row.studentId, lessonId: row.lessonId },
+  });
+
+  if (creditResult?.creditIncreased) {
+    auditLogger.log({
+      action: AUDIT_ACTIONS.MAKEUP_CREDIT_GRANTED,
+      module: AUDIT_MODULES.REQUEST,
+      institutionId: inst,
+      description: `${studentName} için telafi hakkı güncellendi (${creditResult.previousCredit} → ${creditResult.newCredit}).`,
+      newData: {
+        studentId: row.studentId,
+        previousCredit: creditResult.previousCredit,
+        newCredit: creditResult.newCredit,
+        cancellationId: String(cancellationId),
+      },
+    });
+  }
+
+  try {
+    await Promise.all([
+      createInstitutionNotification({
+        institutionId: inst,
+        userId: String(row.studentId ?? ''),
+        title: 'Ders İptal Talebiniz Onaylandı',
+        message: `${lessonDateLabel} tarihli ders iptal talebiniz onaylandı.`,
+        type: LESSON_CANCELLATION_APPROVED,
+      }),
+      createInstitutionNotification({
+        institutionId: inst,
+        userId: String(row.teacherId ?? ''),
+        title: 'Ders İptal Edildi',
+        message: `${studentName}, ${lessonDateLabel} tarihli dersini iptal etti.`,
+        type: LESSON_CANCELLATION_APPROVED,
+      }),
+    ]);
+  } catch {
+    /* bildirim hatası ana akışı bozmasın */
+  }
+}
+
+export async function rejectLessonCancellation(cancellationId, currentUserProfile) {
+  const adminUid = String(auth.currentUser?.uid ?? '').trim();
+  const ref = doc(db, LESSON_CANCELLATIONS_COLLECTION, String(cancellationId));
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    throw new Error('Talep bulunamadı.');
+  }
+  const row = { id: snap.id, ...snap.data() };
+  const inst = assertAdminCanManageRequest(currentUserProfile, row.institutionId);
+  if (String(row.status ?? '') !== LESSON_CANCELLATION_STATUS.PENDING) {
+    throw new Error('Bu talep daha önce işlenmiş.');
+  }
+
+  const rejectData = {
+    status: LESSON_CANCELLATION_STATUS.REJECTED,
+    reviewedBy: adminUid,
+    reviewedAt: serverTimestamp(),
+  };
+
+  await updateDoc(ref, rejectData);
+
+  const studentName = String(row.studentName ?? '').trim() || '(İsimsiz)';
+  const lessonDateLabel = formatRequestedDateTr(String(row.lessonDate ?? ''));
+
+  auditLogger.log({
+    action: AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_REJECTED,
+    module: AUDIT_MODULES.REQUEST,
+    institutionId: inst,
+    description: `${studentName} ders iptal talebi reddedildi (${lessonDateLabel}).`,
+    newData: { cancellationId: String(cancellationId), studentId: row.studentId, lessonId: row.lessonId },
+  });
+
+  try {
+    await createInstitutionNotification({
+      institutionId: inst,
+      userId: String(row.studentId ?? ''),
+      title: 'Ders İptal Talebiniz Reddedildi',
+      message: `${lessonDateLabel} tarihli ders iptal talebiniz reddedildi.`,
+      type: LESSON_CANCELLATION_REJECTED,
+    });
+  } catch {
+    /* ignore */
+  }
+
+  return { rejected: true };
 }
 
 export { buildHoursFromStart };

@@ -31,6 +31,16 @@ export const AUDIT_ACTION_UI_LABELS = Object.freeze({
   [AUDIT_ACTIONS.REJECTED_INSTITUTION_CREATED]: 'Red Veren Kurum Eklendi',
   [AUDIT_ACTIONS.REJECTED_INSTITUTION_UPDATED]: 'Red Veren Kurum Güncellendi',
   [AUDIT_ACTIONS.REJECTED_INSTITUTION_DELETED]: 'Red Veren Kurum Silindi',
+  [AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_CREATED]: 'Ders İptal Talebi Oluşturuldu',
+  [AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_APPROVED]: 'Ders İptal Talebi Onaylandı',
+  [AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_REJECTED]: 'Ders İptal Talebi Reddedildi',
+  [AUDIT_ACTIONS.MAKEUP_CREDIT_GRANTED]: 'Telafi Hakkı Oluşturuldu',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_CREATED]: 'Telafi Talebi Oluşturuldu',
+  [AUDIT_ACTIONS.MAKEUP_CREDIT_RESERVED]: 'Telafi Hakkı Rezerve Edildi',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_APPROVED]: 'Telafi Talebi Onaylandı',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_CREATED_FROM_REQUEST]: 'Telafi Dersi Oluşturuldu',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_REJECTED]: 'Telafi Talebi Reddedildi',
+  [AUDIT_ACTIONS.MAKEUP_CREDIT_RETURNED]: 'Telafi Hakkı Geri Verildi',
 });
 
 /** @param {string} action Firestore action değeri (ör. institution_created) */

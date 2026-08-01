@@ -26,6 +26,16 @@ export const AUDIT_ACTIONS = Object.freeze({
   REJECTED_INSTITUTION_CREATED: 'rejected_institution_created',
   REJECTED_INSTITUTION_UPDATED: 'rejected_institution_updated',
   REJECTED_INSTITUTION_DELETED: 'rejected_institution_deleted',
+  LESSON_CANCELLATION_REQUEST_CREATED: 'lesson_cancellation_request_created',
+  LESSON_CANCELLATION_REQUEST_APPROVED: 'lesson_cancellation_request_approved',
+  LESSON_CANCELLATION_REQUEST_REJECTED: 'lesson_cancellation_request_rejected',
+  MAKEUP_CREDIT_GRANTED: 'makeup_credit_granted',
+  MAKEUP_LESSON_REQUEST_CREATED: 'makeup_lesson_request_created',
+  MAKEUP_CREDIT_RESERVED: 'makeup_credit_reserved',
+  MAKEUP_LESSON_REQUEST_APPROVED: 'makeup_lesson_request_approved',
+  MAKEUP_LESSON_CREATED_FROM_REQUEST: 'makeup_lesson_created_from_request',
+  MAKEUP_LESSON_REQUEST_REJECTED: 'makeup_lesson_request_rejected',
+  MAKEUP_CREDIT_RETURNED: 'makeup_credit_returned',
 });
 
 export const AUDIT_ACTION_KEYS = Object.freeze(Object.values(AUDIT_ACTIONS));
@@ -57,6 +67,16 @@ export const AUDIT_ACTION_COLOR_CATEGORY = Object.freeze({
   [AUDIT_ACTIONS.REJECTED_INSTITUTION_CREATED]: 'create',
   [AUDIT_ACTIONS.REJECTED_INSTITUTION_UPDATED]: 'update',
   [AUDIT_ACTIONS.REJECTED_INSTITUTION_DELETED]: 'delete',
+  [AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_CREATED]: 'create',
+  [AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_APPROVED]: 'update',
+  [AUDIT_ACTIONS.LESSON_CANCELLATION_REQUEST_REJECTED]: 'delete',
+  [AUDIT_ACTIONS.MAKEUP_CREDIT_GRANTED]: 'subscription',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_CREATED]: 'create',
+  [AUDIT_ACTIONS.MAKEUP_CREDIT_RESERVED]: 'update',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_APPROVED]: 'update',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_CREATED_FROM_REQUEST]: 'create',
+  [AUDIT_ACTIONS.MAKEUP_LESSON_REQUEST_REJECTED]: 'delete',
+  [AUDIT_ACTIONS.MAKEUP_CREDIT_RETURNED]: 'update',
 });
 
 export const AUDIT_COLOR_CATEGORY_CLASS = Object.freeze({
@@ -81,6 +101,7 @@ export const AUDIT_MODULES = Object.freeze({
   INVITE: 'invite',
   DEMO: 'demo',
   REJECTED_INSTITUTION: 'rejected_institution',
+  REQUEST: 'request',
 });
 
 export const AUDIT_MODULE_LABELS = Object.freeze({
@@ -94,6 +115,7 @@ export const AUDIT_MODULE_LABELS = Object.freeze({
   [AUDIT_MODULES.INVITE]: 'Davet Kodu',
   [AUDIT_MODULES.DEMO]: 'Demo Talebi',
   [AUDIT_MODULES.REJECTED_INSTITUTION]: 'Red Veren Kurum',
+  [AUDIT_MODULES.REQUEST]: 'Talep',
 });
 
 /** @param {string} action */

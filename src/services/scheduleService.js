@@ -1,5 +1,6 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { LESSON_CANCELLATIONS_COLLECTION, isEffectiveCancellationStatus } from '../constants/lessonCancellationCollection';
 
 export const WEEKDAY_OPTIONS = [
   { day: 1, label: 'Pazartesi' },
@@ -212,7 +213,7 @@ function filterCancellationsForWeek(cancellations, weekStartDate, teacherId = nu
   const ws = String(weekStartDate ?? '').trim();
   const tid = teacherId ? String(teacherId) : null;
   return (cancellations || []).filter((c) => {
-    if (String(c.status ?? '') !== 'cancelled') {
+    if (!isEffectiveCancellationStatus(c.status)) {
       return false;
     }
     if (tid && String(c.teacherId ?? '') !== tid) {
@@ -469,7 +470,7 @@ export async function fetchCancellationsForInstitution(institutionId) {
   }
   try {
     const snap = await getDocs(
-      query(collection(db, 'lessonCancellations'), where('institutionId', '==', inst)),
+      query(collection(db, LESSON_CANCELLATIONS_COLLECTION), where('institutionId', '==', inst)),
     );
     return snap.docs.map(mapCancellationDoc);
   } catch (error) {

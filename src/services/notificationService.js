@@ -7,6 +7,8 @@ export const ATTENDANCE_REQUEST_APPROVED = 'attendance_request_approved';
 export const ATTENDANCE_REQUEST_REJECTED = 'attendance_request_rejected';
 export const MAKEUP_LESSON_CREATED = 'makeup_lesson_created';
 export const MAKEUP_LESSON_REJECTED = 'makeup_lesson_rejected';
+export const LESSON_CANCELLATION_APPROVED = 'lesson_cancellation_approved';
+export const LESSON_CANCELLATION_REJECTED = 'lesson_cancellation_rejected';
 
 /**
  * Firestore bildirimi — push yok (web panel).

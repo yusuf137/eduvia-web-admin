@@ -1049,6 +1049,16 @@ input {
   font-size: 0.88rem;
 }
 
+.requests-section-head {
+  margin-bottom: 4px;
+}
+
+.requests-section-title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
 .request-card {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
